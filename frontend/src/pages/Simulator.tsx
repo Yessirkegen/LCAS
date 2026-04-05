@@ -2,11 +2,11 @@ import { useState } from "react";
 import { startSimulator, stopSimulator, runScenario } from "../services/api";
 
 const SCENARIOS = [
-  { id: "overheat_water", name: "Перегрев воды", desc: "Температура воды → 116°C за 30 сек", duration: 30 },
-  { id: "overheat_oil", name: "Перегрев масла", desc: "Температура масла → 98°C за 30 сек", duration: 30 },
-  { id: "air_leak", name: "Утечка воздуха", desc: "Давление ГР падает за 45 сек", duration: 45 },
-  { id: "ground_fault", name: "Земля в цепях", desc: "Замыкание силовых цепей", duration: 15 },
-  { id: "cascade", name: "Каскадный отказ", desc: "Масло → вода → земля → стоп", duration: 90 },
+  { id: "overheat_water", name: "Перегрев воды", color: "var(--error)" },
+  { id: "overheat_oil", name: "Перегрев масла", color: "var(--error)" },
+  { id: "air_leak", name: "Утечка воздуха", color: "var(--secondary-container)" },
+  { id: "ground_fault", name: "Каскадный отказ", color: "var(--secondary-container)" },
+  { id: "cascade", name: "Разгон-торможение", color: "var(--on-surface-variant)" },
 ];
 
 export default function Simulator() {
@@ -34,104 +34,104 @@ export default function Simulator() {
     addLog("Остановлено");
   };
 
-  const handleScenario = async (id: string, duration: number) => {
+  const handleScenario = async (id: string, dur = 30) => {
     if (!running) await handleStart();
     setActiveScenario(id);
-    await runScenario(locoId, id, duration);
-    addLog(`Сценарий: ${id} (${duration} сек)`);
-    setTimeout(() => setActiveScenario(null), duration * 1000);
+    await runScenario(locoId, id, dur);
+    addLog(`Сценарий: ${id}`);
+    setTimeout(() => setActiveScenario(null), dur * 1000);
   };
 
   return (
-    <div className="page simulator-page">
-      <header className="page-header">
-        <h2>Simulator Control Panel</h2>
-        <span className={`status-badge ${running ? "online" : "offline"}`}>
-          {running ? `● Sending ${hz} Hz` : "○ Stopped"}
-        </span>
-      </header>
+    <>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Пульт управления симулятором</div>
+          <div className="page-subtitle">Интерфейс манипуляции телеметрией в реальном времени</div>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <button className={`scenario-btn ${running ? "" : ""}`} style={{ borderColor: running ? "var(--primary)" : undefined, color: running ? "var(--primary)" : undefined }}>
+            {running ? "● Ручной" : "Ручной"}
+          </button>
+          <button className="scenario-btn">Авто-симулятор</button>
+          <button className="scenario-btn">Сценарий</button>
+          <div style={{ marginLeft: "0.5rem", padding: "0.5rem 0.875rem", background: "var(--surface-container-low)", borderRadius: "var(--radius)", fontFamily: "var(--font-display)", fontSize: "0.8rem" }}>
+            {locoId} ▾
+          </div>
+        </div>
+      </div>
 
-      <div className="sim-grid">
-        <div className="widget">
-          <h3>Локомотив</h3>
-          <div className="sim-form">
-            <label>
-              ID
-              <input type="text" value={locoId} onChange={(e) => setLocoId(e.target.value)} />
-            </label>
-            <label>
-              Частота (Гц)
-              <select value={hz} onChange={(e) => setHz(Number(e.target.value))}>
-                <option value={1}>1 Hz</option>
-                <option value={2}>2 Hz</option>
-                <option value={5}>5 Hz</option>
-                <option value={10}>10 Hz</option>
-              </select>
-            </label>
-            <div className="sim-actions">
-              <button className="btn-start" onClick={handleStart} disabled={running}>Запустить</button>
-              <button className="btn-stop" onClick={handleStop} disabled={!running}>Остановить</button>
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+        {/* Movement */}
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">✓</span> Движение и динамика</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+            <div className="tele-value tele-value-lg" style={{ color: "var(--primary)" }}>72.4</div>
+            <div className="tele-label">MPH VELOCITY</div>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <span className="tele-label">0 MPH</span>
+            <input type="range" min="0" max="120" defaultValue="72" style={{ flex: 1, accentColor: "var(--primary)" }} />
+            <span className="tele-label">120 MPH</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <span className="tele-label">Боксование</span>
+            <button className="scenario-btn" style={{ padding: "0.25rem 0.5rem", fontSize: "0.6rem" }}>OFF</button>
           </div>
         </div>
 
-        <div className="widget">
-          <h3>Готовые сценарии</h3>
-          <div className="scenario-list">
+        {/* Scenarios */}
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">🔥</span> Сценарии</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
             {SCENARIOS.map((s) => (
               <button
                 key={s.id}
                 className={`scenario-btn ${activeScenario === s.id ? "active" : ""}`}
-                onClick={() => handleScenario(s.id, s.duration)}
+                style={{ borderColor: activeScenario === s.id ? s.color : undefined, color: activeScenario === s.id ? s.color : undefined, fontSize: "0.65rem" }}
+                onClick={() => handleScenario(s.id)}
               >
-                <span className="scenario-name">{s.name}</span>
-                <span className="scenario-desc">{s.desc}</span>
+                {s.name}
               </button>
             ))}
           </div>
+          <button className="scenario-btn" style={{ width: "100%", marginTop: "0.5rem", borderColor: "var(--primary)", color: "var(--primary)" }} onClick={handleStart}>
+            Нормальная работа
+          </button>
         </div>
 
-        <div className="widget">
-          <h3>Highload-тест</h3>
-          <div className="sim-form">
-            <label>
-              Локомотивов
-              <div className="highload-btns">
-                {[1, 10, 50, 100, 500, 1700].map((n) => (
-                  <button
-                    key={n}
-                    className={`hl-btn ${count === n ? "active" : ""}`}
-                    onClick={() => setCount(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <div className="sim-actions">
-              <button className="btn-start" onClick={async () => {
-                const res = await startSimulator(locoId, hz, count);
-                setRunning(true);
-                addLog(`Highload: ${count} лок × ${hz} Hz = ${count * hz} RPS`);
-              }}>
-                Запустить {count} × {hz} Hz = {count * hz} RPS
-              </button>
-              <button className="btn-stop" onClick={handleStop}>Стоп</button>
-            </div>
+        {/* Highload */}
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">⚡</span> Высокая нагрузка</div>
+          <div className="tele-label">Кол-во виртуальных тепловозов</div>
+          <div className="highload-btns" style={{ marginTop: "0.5rem", marginBottom: "1rem" }}>
+            {[1, 10, 100, 500, 1700].map((n) => (
+              <button key={n} className={`hl-btn ${count === n ? "active" : ""}`} onClick={() => setCount(n)}>{n}</button>
+            ))}
           </div>
-        </div>
-
-        <div className="widget">
-          <h3>Лог</h3>
-          <div className="sim-log">
-            {log.length === 0 ? (
-              <span className="log-empty">Нет событий</span>
-            ) : (
-              log.map((entry, i) => <div key={i} className="log-entry">{entry}</div>)
-            )}
+          <div className="sim-actions">
+            <button className="btn-start" onClick={async () => { await startSimulator(locoId, hz, count); setRunning(true); addLog(`Highload: ${count}×${hz}Hz = ${count*hz} RPS`); }}>
+              Запустить тест
+            </button>
+            <button className="btn-stop" onClick={handleStop}>Стоп</button>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Telemetry Stream Log */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-header-icon">📡</span> Поток телеметрии
+          <span style={{ marginLeft: "auto", width: "8px", height: "8px", borderRadius: "50%", background: running ? "var(--primary)" : "var(--outline)", display: "inline-block" }} />
+        </div>
+        <div className="sim-log">
+          {log.length === 0 ? (
+            <span className="log-empty">Нет событий</span>
+          ) : (
+            log.map((entry, i) => <div key={i} className="log-entry">{entry}</div>)
+          )}
+        </div>
+      </div>
+    </>
   );
 }

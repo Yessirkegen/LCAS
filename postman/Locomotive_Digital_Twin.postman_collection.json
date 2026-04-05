@@ -1,0 +1,584 @@
+{
+  "info": {
+    "name": "Locomotive Digital Twin — LCAS",
+    "description": "Цифровой двойник локомотива ТЭ33А.\n\nПорядок запуска:\n1. Health Check\n2. Login (токен сохраняется автоматически)\n3. Simulator → Start\n4. Остальные запросы",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "🟢 Health & Auth",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Backend is healthy', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (admin)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.environment.set('token', json.token);",
+                  "    pm.environment.set('role', json.role);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (driver)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"driver\",\n  \"password\": \"driver123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Driver login', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.role).to.eql('driver');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (dispatcher)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"dispatcher\",\n  \"password\": \"dispatcher123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login — Invalid credentials",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"wrong\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rejected with 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🚂 Simulator",
+      "item": [
+        {
+          "name": "Start Simulator (1 loco)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/start?locomotive_id={{loco_id}}&route=loop&hz=1&count=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Simulator started', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('started');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Simulator (10 locos — load test)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/start?locomotive_id=TE33A-LOAD&route=loop&hz=1&count=10"
+          }
+        },
+        {
+          "name": "Simulator Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/simulator/status"
+          }
+        },
+        {
+          "name": "Scenario — Overheat Water (30s)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/scenario?locomotive_id={{loco_id}}&scenario=overheat_water&duration_seconds=30"
+          }
+        },
+        {
+          "name": "Scenario — Overheat Oil (30s)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/scenario?locomotive_id={{loco_id}}&scenario=overheat_oil&duration_seconds=30"
+          }
+        },
+        {
+          "name": "Scenario — Air Leak (45s)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/scenario?locomotive_id={{loco_id}}&scenario=air_leak&duration_seconds=45"
+          }
+        },
+        {
+          "name": "Scenario — Ground Fault (15s)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/scenario?locomotive_id={{loco_id}}&scenario=ground_fault&duration_seconds=15"
+          }
+        },
+        {
+          "name": "Scenario — Cascade Failure (90s)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/scenario?locomotive_id={{loco_id}}&scenario=cascade&duration_seconds=90"
+          }
+        },
+        {
+          "name": "Set Parameter (speed=100)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/set?locomotive_id={{loco_id}}&param=speed&value=100"
+          }
+        },
+        {
+          "name": "Stop Simulator (all)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/stop"
+          }
+        },
+        {
+          "name": "Stop Simulator (single)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/stop?locomotive_id={{loco_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Fleet & Telemetry",
+      "item": [
+        {
+          "name": "List Locomotives",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Fleet list returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.total).to.be.a('number');",
+                  "    pm.expect(json.locomotives).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Locomotive State",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/{{loco_id}}/state"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('State returned with HI', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.state).to.be.an('object');",
+                  "    pm.expect(json.health_index).to.be.an('object');",
+                  "    pm.expect(json.health_index.value).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Telemetry History (5 min)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/{{loco_id}}/telemetry?minutes=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Telemetry history returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.count).to.be.a('number');",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Telemetry History (15 min)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/{{loco_id}}/telemetry?minutes=15"
+          }
+        },
+        {
+          "name": "Get Alerts History",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/{{loco_id}}/alerts?limit=50"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📥 Ingestion",
+      "item": [
+        {
+          "name": "Ingest Telemetry Packet",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/telemetry",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locomotive_id\": \"TE33A-TEST\",\n  \"speed_kmh\": 72.5,\n  \"wheel_slip\": false,\n  \"water_temp_inlet\": 82.3,\n  \"water_temp_outlet\": 87.1,\n  \"oil_temp_inlet\": 76.4,\n  \"oil_temp_outlet\": 79.2,\n  \"air_temp_collector\": 420.0,\n  \"fuel_temp\": 32.1,\n  \"water_pressure_kpa\": 245,\n  \"oil_pressure_kpa\": 480,\n  \"air_pressure_kpa\": 210,\n  \"air_consumption\": 2400,\n  \"main_reservoir_pressure\": 8.8,\n  \"brake_line_pressure\": 5.0,\n  \"compressor_active\": false,\n  \"traction_current\": 520,\n  \"traction_effort\": 280,\n  \"ground_fault_power\": false,\n  \"ground_fault_aux\": false,\n  \"generator_voltage\": 850,\n  \"generator_current\": 1800,\n  \"fuel_level\": 65.4,\n  \"fuel_consumption\": 180.5,\n  \"lat\": 51.1694,\n  \"lon\": 71.4491\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Packet accepted', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('accepted');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ingest — Critical Values (triggers alert)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/telemetry",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locomotive_id\": \"TE33A-TEST\",\n  \"speed_kmh\": 45,\n  \"water_temp_inlet\": 110,\n  \"water_temp_outlet\": 118,\n  \"oil_temp_inlet\": 92,\n  \"oil_temp_outlet\": 98,\n  \"oil_pressure_kpa\": 150,\n  \"main_reservoir_pressure\": 6.8,\n  \"ground_fault_power\": true,\n  \"fuel_level\": 8,\n  \"lat\": 51.17,\n  \"lon\": 71.45\n}"
+            }
+          }
+        },
+        {
+          "name": "Ingest Batch (2 packets)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/telemetry/batch",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"locomotive_id\": \"TE33A-BATCH1\",\n    \"speed_kmh\": 80,\n    \"water_temp_outlet\": 85,\n    \"oil_temp_outlet\": 78\n  },\n  {\n    \"locomotive_id\": \"TE33A-BATCH2\",\n    \"speed_kmh\": 60,\n    \"water_temp_outlet\": 90,\n    \"oil_temp_outlet\": 82\n  }\n]"
+            }
+          }
+        },
+        {
+          "name": "Ingest — Invalid (out of bounds)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/telemetry",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locomotive_id\": \"TE33A-INVALID\",\n  \"speed_kmh\": 999,\n  \"water_temp_outlet\": -999,\n  \"fuel_level\": 200\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Admin Config",
+      "item": [
+        {
+          "name": "Get Thresholds",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/thresholds"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Thresholds returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.thresholds).to.be.an('array');",
+                  "    pm.expect(json.thresholds.length).to.be.above(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Threshold (water_temp_outlet)",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/admin/thresholds/water_temp_outlet",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"norm_min\": 71,\n  \"norm_max\": 91,\n  \"warn_max\": 100,\n  \"crit_max\": 115\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Weights",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/weights"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Weights returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.weights).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Weight (water_temp_outlet)",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/admin/weights/water_temp_outlet?weight=0.12"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📄 Reports",
+      "item": [
+        {
+          "name": "Export CSV (5 min)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/reports/export/{{loco_id}}?minutes=5&format=csv"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('CSV returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export JSON (15 min)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/reports/export/{{loco_id}}?minutes=15&format=json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Full Demo Flow",
+      "description": "Запускайте по порядку — полный демо-сценарий для жюри",
+      "item": [
+        {
+          "name": "1. Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          }
+        },
+        {
+          "name": "2. Login as admin",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"admin\", \"password\": \"admin123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.set('token', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Start Simulator",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/start?locomotive_id=TE33A-0142&route=loop&hz=1"
+          }
+        },
+        {
+          "name": "4. Check Fleet (wait 5s)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives"
+          }
+        },
+        {
+          "name": "5. Get State + HI",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/TE33A-0142/state"
+          }
+        },
+        {
+          "name": "6. Run Overheat Scenario",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/scenario?locomotive_id=TE33A-0142&scenario=overheat_water&duration_seconds=30"
+          }
+        },
+        {
+          "name": "7. Check Alerts (wait 20s)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/TE33A-0142/state"
+          }
+        },
+        {
+          "name": "8. Get Telemetry History",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/locomotives/TE33A-0142/telemetry?minutes=5"
+          }
+        },
+        {
+          "name": "9. Export CSV",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/reports/export/TE33A-0142?minutes=5&format=csv"
+          }
+        },
+        {
+          "name": "10. Stop Simulator",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/simulator/stop"
+          }
+        }
+      ]
+    }
+  ]
+}

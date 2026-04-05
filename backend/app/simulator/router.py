@@ -6,7 +6,10 @@ from typing import Optional
 
 from fastapi import APIRouter
 
+import random as _random
+
 from app.simulator.engine import LocomotiveSimulator
+from app.simulator.routes_osm import ROUTES_KZ, ALL_ROUTE_IDS
 from app.services.kafka_client import kafka_producer
 
 logger = logging.getLogger(__name__)
@@ -36,22 +39,35 @@ async def _run_simulator(sim: LocomotiveSimulator, hz: float = 1.0):
 @router.post("/start")
 async def start_simulator(
     locomotive_id: str = "TE33A-0142",
-    route: str = "loop",
+    route: str = "astana_karaganda",
     hz: float = 1.0,
     count: int = 1,
 ):
     started = []
+    routes_used: dict[str, int] = {}
     for i in range(count):
         lid = locomotive_id if count == 1 else f"TE33A-{i:04d}"
         if lid in _tasks and not _tasks[lid].done():
             continue
-        sim = LocomotiveSimulator(locomotive_id=lid, route=route)
-        sim.speed = 60 + (i % 40)
+
+        if count > 1:
+            r = _random.choice(ALL_ROUTE_IDS)
+        else:
+            r = route
+
+        sim = LocomotiveSimulator(locomotive_id=lid, route=r)
+        sim.speed = 40 + _random.randint(0, 60)
+
+        if count > 1:
+            total = sim.total_km
+            sim.distance_km = _random.uniform(0, total * 0.9)
+
         _simulators[lid] = sim
         _tasks[lid] = asyncio.create_task(_run_simulator(sim, hz))
         started.append(lid)
+        routes_used[r] = routes_used.get(r, 0) + 1
 
-    return {"status": "started", "locomotives": started, "hz": hz}
+    return {"status": "started", "locomotives": started, "hz": hz, "routes": routes_used}
 
 
 @router.post("/stop")
@@ -110,6 +126,27 @@ async def run_scenario(
         "duration": duration_seconds,
         "locomotive_id": locomotive_id,
     }
+
+
+@router.get("/routes")
+async def get_routes():
+    result = {}
+    for route_id, route in ROUTES_KZ.items():
+        result[route_id] = {
+            "name": route["name"],
+            "total_km": route["total_km"],
+            "geojson": {
+                "type": "Feature",
+                "properties": {"name": route["name"], "total_km": route["total_km"]},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[p[1], p[0]] for p in route["points"]],
+                },
+            },
+            "stations": route.get("stations", []),
+            "restrictions": route.get("restrictions", []),
+        }
+    return {"routes": result}
 
 
 @router.get("/status")

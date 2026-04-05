@@ -11,6 +11,16 @@ from sqlalchemy import text
 
 from app.services.database import async_session
 from app.services.redis_client import redis_client
+from app.services.feature_flags import get_flags, set_flag
+from app.services.webhook import register_webhook, remove_webhook
+from app.services.circuit_breaker import db_circuit_breaker
+from app.processor.incident_timeline import get_active_incident, get_event_log
+from app.services.tracing import get_recent_traces, get_latency_percentiles
+from app.simulator.consist import get_consist
+from app.simulator.schedule import compute_schedule
+from app.simulator.routes_osm import ROUTES_KZ
+from app.simulator.elevation import get_elevation_profile, get_gradient
+from app.services.weather import get_weather_along_route
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -154,3 +164,125 @@ async def export_report(loco_id: str, minutes: int = Query(default=15), format: 
         )
 
     return {"locomotive_id": loco_id, "period_minutes": minutes, "records": len(rows), "data": [dict(r) for r in rows]}
+
+
+@router.get("/admin/feature-flags")
+async def get_feature_flags():
+    return {"flags": await get_flags()}
+
+
+@router.put("/admin/feature-flags/{flag}")
+async def update_feature_flag(flag: str, enabled: bool = True):
+    await set_flag(flag, enabled)
+    return {"status": "updated", "flag": flag, "enabled": enabled}
+
+
+@router.post("/admin/webhooks")
+async def add_webhook(url: str):
+    register_webhook(url)
+    return {"status": "registered", "url": url}
+
+
+@router.delete("/admin/webhooks")
+async def del_webhook(url: str):
+    remove_webhook(url)
+    return {"status": "removed", "url": url}
+
+
+@router.get("/admin/system-status")
+async def system_status():
+    active_locos = await redis_client.zcard("locomotives:active")
+    redis_info = await redis_client.info("memory")
+    return {
+        "backend": "online",
+        "database": "online" if not db_circuit_breaker.is_open else "degraded",
+        "db_circuit_breaker": db_circuit_breaker.state,
+        "redis": "online",
+        "redis_memory_mb": round(redis_info.get("used_memory", 0) / 1024 / 1024, 1),
+        "active_locomotives": active_locos,
+        "feature_flags": await get_flags(),
+        "latency": get_latency_percentiles(),
+    }
+
+
+@router.get("/admin/traces")
+async def get_traces(n: int = Query(default=20, le=100)):
+    return {"traces": get_recent_traces(n), "percentiles": get_latency_percentiles()}
+
+
+@router.get("/locomotives/{loco_id}/incident")
+async def get_incident(loco_id: str):
+    incident = get_active_incident(loco_id)
+    return {"incident": incident}
+
+
+@router.get("/locomotives/{loco_id}/events")
+async def get_events(loco_id: str, last: int = Query(default=50, le=200)):
+    return {"events": get_event_log(loco_id, last)}
+
+
+@router.get("/locomotives/{loco_id}/consist")
+async def get_loco_consist(loco_id: str):
+    return get_consist(loco_id)
+
+
+@router.get("/locomotives/{loco_id}/schedule")
+async def get_loco_schedule(loco_id: str, route: str = Query(default="astana_karaganda")):
+    route_data = ROUTES_KZ.get(route)
+    if not route_data:
+        raise HTTPException(404, "Route not found")
+
+    state_raw = await redis_client.get(f"locomotive:{loco_id}:state")
+    if not state_raw:
+        raise HTTPException(404, "Locomotive not found")
+
+    state = json.loads(state_raw)
+    speed = state.get("speed_kmh", 60)
+
+    from app.simulator.router import _simulators
+    sim = _simulators.get(loco_id)
+    distance = sim.distance_km if sim else 0
+
+    schedule = compute_schedule(route_data, distance, speed)
+    return {"locomotive_id": loco_id, "route": route, "schedule": schedule}
+
+
+@router.get("/routes/{route_id}/elevation")
+async def get_route_elevation(route_id: str):
+    profile = get_elevation_profile(route_id)
+    if not profile:
+        raise HTTPException(404, "Route not found")
+    return {"route": route_id, "profile": profile}
+
+
+@router.get("/routes/{route_id}/weather")
+async def get_route_weather(route_id: str):
+    route_data = ROUTES_KZ.get(route_id)
+    if not route_data:
+        raise HTTPException(404, "Route not found")
+    weather = get_weather_along_route(route_data.get("stations", []))
+    return {"route": route_id, "weather": weather}
+
+
+_annotations: list[dict] = []
+
+
+@router.post("/annotations")
+async def add_annotation(locomotive_id: str, timestamp: str, text: str, param: str = ""):
+    annotation = {
+        "id": len(_annotations) + 1,
+        "locomotive_id": locomotive_id,
+        "timestamp": timestamp,
+        "text": text,
+        "param": param,
+        "created_by": "dispatcher",
+    }
+    _annotations.append(annotation)
+    return {"status": "created", "annotation": annotation}
+
+
+@router.get("/annotations")
+async def get_annotations(locomotive_id: str = ""):
+    if locomotive_id:
+        return {"annotations": [a for a in _annotations if a["locomotive_id"] == locomotive_id]}
+    return {"annotations": _annotations}

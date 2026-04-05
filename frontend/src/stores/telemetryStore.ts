@@ -71,10 +71,12 @@ interface TelemetryStore {
   data: TelemetryData | null;
   healthIndex: HealthIndex | null;
   alerts: Alert[];
+  acknowledgedParams: Set<string>;
   history: HistoryPoint[];
   maxHistory: number;
 
   update: (msg: any) => void;
+  acknowledgeAll: () => void;
   clearHistory: () => void;
 }
 
@@ -82,12 +84,28 @@ export const useTelemetryStore = create<TelemetryStore>((set, get) => ({
   data: null,
   healthIndex: null,
   alerts: [],
+  acknowledgedParams: new Set<string>(),
   history: [],
   maxHistory: 300,
 
   update: (msg: any) => {
     if (msg.type === "telemetry") {
       const state = get();
+      const acked = state.acknowledgedParams;
+
+      const incomingAlerts: Alert[] = msg.alerts || [];
+
+      const merged = incomingAlerts.map((a) => {
+        if (acked.has(a.param)) {
+          return { ...a, status: "acknowledged" };
+        }
+        return a;
+      });
+
+      const stillActive = incomingAlerts.some((a) => a.level === "WARNING" && !acked.has(a.param));
+      const resolvedParams = new Set(incomingAlerts.map((a) => a.param));
+      const cleanedAcked = new Set([...acked].filter((p) => resolvedParams.has(p)));
+
       const newHistory = [
         ...state.history.slice(-(state.maxHistory - 1)),
         {
@@ -104,10 +122,23 @@ export const useTelemetryStore = create<TelemetryStore>((set, get) => ({
       set({
         data: msg.data || state.data,
         healthIndex: msg.health_index || state.healthIndex,
-        alerts: msg.alerts || state.alerts,
+        alerts: merged,
+        acknowledgedParams: cleanedAcked,
         history: newHistory,
       });
     }
+  },
+
+  acknowledgeAll: () => {
+    const state = get();
+    const newAcked = new Set(state.acknowledgedParams);
+    state.alerts.forEach((a) => {
+      if (a.level === "WARNING") newAcked.add(a.param);
+    });
+    set({
+      alerts: state.alerts.map((a) => ({ ...a, status: "acknowledged" })),
+      acknowledgedParams: newAcked,
+    });
   },
 
   clearHistory: () => set({ history: [] }),

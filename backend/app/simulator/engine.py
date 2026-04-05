@@ -8,39 +8,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.telemetry import TelemetryPacket
-
-ROUTES = {
-    "astana_karaganda": {
-        "name": "Астана — Караганда",
-        "points": [
-            (51.1694, 71.4491, 0),
-            (51.05, 71.60, 30),
-            (50.80, 72.00, 80),
-            (50.50, 72.50, 140),
-            (50.20, 72.80, 180),
-            (49.80, 73.10, 230),
-        ],
-        "total_km": 230,
-    },
-    "loop": {
-        "name": "Кольцевой (демо)",
-        "points": [
-            (51.17, 71.45, 0),
-            (51.20, 71.50, 10),
-            (51.22, 71.55, 20),
-            (51.20, 71.58, 30),
-            (51.17, 71.55, 40),
-            (51.17, 71.45, 50),
-        ],
-        "total_km": 50,
-    },
-}
+from app.simulator.routes_osm import ROUTES_KZ as ROUTES
 
 
 class LocomotiveSimulator:
-    def __init__(self, locomotive_id: str = "TE33A-0142", route: str = "loop"):
+    def __init__(self, locomotive_id: str = "TE33A-0142", route: str = "astana_karaganda"):
         self.locomotive_id = locomotive_id
-        self.route_data = ROUTES.get(route, ROUTES["loop"])
+        fallback = next(iter(ROUTES.values()))
+        self.route_data = ROUTES.get(route, fallback)
         self.total_km = self.route_data["total_km"]
 
         self.speed = 60.0

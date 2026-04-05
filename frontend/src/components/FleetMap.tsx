@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -18,15 +18,16 @@ interface Props {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  normal: "#22c55e",
-  attention: "#eab308",
-  critical: "#ef4444",
+  normal: "#75ff9e",
+  attention: "#fdd400",
+  critical: "#ffb4ab",
 };
 
 export default function FleetMap({ locomotives, selectedId, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const [railwaysLoaded, setRailwaysLoaded] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -43,14 +44,95 @@ export default function FleetMap({ locomotives, selectedId, onSelect }: Props) {
             attribution: "© OpenStreetMap",
           },
         },
-        layers: [{ id: "osm", type: "raster", source: "osm" }],
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+            paint: { "raster-saturation": -0.8, "raster-brightness-max": 0.4 },
+          },
+        ],
       },
-      center: [71.45, 51.17],
-      zoom: 5,
+      center: [68.0, 48.5],
+      zoom: 4.5,
     });
 
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     mapRef.current = map;
+
+    map.on("load", () => {
+      fetch("/geo/kz_railways.json")
+        .then((r) => r.json())
+        .then((geojson) => {
+          map.addSource("kz-railways", { type: "geojson", data: geojson });
+
+          map.addLayer({
+            id: "kz-railways-line",
+            type: "line",
+            source: "kz-railways",
+            paint: {
+              "line-color": "#75ff9e",
+              "line-width": 1.5,
+              "line-opacity": 0.5,
+            },
+          });
+
+          map.addLayer({
+            id: "kz-railways-glow",
+            type: "line",
+            source: "kz-railways",
+            paint: {
+              "line-color": "#75ff9e",
+              "line-width": 4,
+              "line-opacity": 0.08,
+              "line-blur": 3,
+            },
+          });
+
+          setRailwaysLoaded(true);
+        })
+        .catch((e) => console.error("Failed to load railways:", e));
+
+      fetch("/geo/kz_stations.json")
+        .then((r) => r.json())
+        .then((geojson) => {
+          map.addSource("kz-stations", { type: "geojson", data: geojson });
+
+          map.addLayer({
+            id: "kz-stations-circle",
+            type: "circle",
+            source: "kz-stations",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 1, 7, 3, 10, 5],
+              "circle-color": "#ffffff",
+              "circle-stroke-color": "#75ff9e",
+              "circle-stroke-width": 1,
+              "circle-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0, 6, 0.5, 8, 1],
+            },
+          });
+
+          map.addLayer({
+            id: "kz-stations-label",
+            type: "symbol",
+            source: "kz-stations",
+            layout: {
+              "text-field": ["get", "name"],
+              "text-size": 10,
+              "text-offset": [0, 1.2],
+              "text-anchor": "top",
+              "text-font": ["Open Sans Regular"],
+            },
+            paint: {
+              "text-color": "#bacbb9",
+              "text-halo-color": "#121416",
+              "text-halo-width": 1,
+              "text-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0, 8, 1],
+            },
+            minzoom: 7,
+          });
+        })
+        .catch((e) => console.error("Failed to load stations:", e));
+    });
 
     return () => {
       map.remove();
@@ -82,24 +164,27 @@ export default function FleetMap({ locomotives, selectedId, onSelect }: Props) {
         marker.setLngLat([loco.lon, loco.lat]);
         const el = marker.getElement();
         el.style.background = color;
-        el.style.border = isSelected ? "3px solid white" : "2px solid rgba(0,0,0,0.3)";
-        el.style.width = isSelected ? "16px" : "12px";
-        el.style.height = isSelected ? "16px" : "12px";
+        el.style.border = isSelected ? "3px solid white" : "2px solid rgba(0,0,0,0.5)";
+        el.style.width = isSelected ? "16px" : "10px";
+        el.style.height = isSelected ? "16px" : "10px";
+        el.style.boxShadow = `0 0 ${isSelected ? "12" : "6"}px ${color}`;
       } else {
         const el = document.createElement("div");
-        el.style.width = "12px";
-        el.style.height = "12px";
+        el.style.width = "10px";
+        el.style.height = "10px";
         el.style.borderRadius = "50%";
         el.style.background = color;
-        el.style.border = "2px solid rgba(0,0,0,0.3)";
+        el.style.border = "2px solid rgba(0,0,0,0.5)";
         el.style.cursor = "pointer";
+        el.style.boxShadow = `0 0 6px ${color}`;
+        el.style.transition = "all 0.3s ease";
         el.onclick = () => onSelect?.(loco.locomotive_id);
 
         const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(`
-          <div style="font-size:12px;color:#111">
+          <div style="font-family:Space Grotesk,sans-serif;font-size:12px;color:#e1e3de;background:#1a1d20;padding:8px 12px;border-radius:4px;border-left:3px solid ${color}">
             <b>${loco.locomotive_id}</b><br>
-            HI: ${loco.health_index ?? "—"}<br>
-            ${loco.speed_kmh?.toFixed(0) ?? "—"} км/ч
+            HI: <span style="color:${color};font-weight:700">${loco.health_index ?? "—"}</span><br>
+            ${loco.speed_kmh?.toFixed(0) ?? "—"} km/h
           </div>
         `);
 
@@ -113,5 +198,5 @@ export default function FleetMap({ locomotives, selectedId, onSelect }: Props) {
     }
   }, [locomotives, selectedId, onSelect]);
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: 350, borderRadius: "0.5rem" }} />;
+  return <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: 350, borderRadius: "var(--radius)" }} />;
 }

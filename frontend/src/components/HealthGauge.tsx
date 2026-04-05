@@ -7,9 +7,9 @@ interface Props {
 }
 
 const COLORS = {
-  normal: "#22c55e",
-  attention: "#eab308",
-  critical: "#ef4444",
+  normal: "#75ff9e",
+  attention: "#fdd400",
+  critical: "#ffb4ab",
 };
 
 const PARAM_LABELS: Record<string, string> = {

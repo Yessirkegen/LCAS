@@ -41,24 +41,43 @@ export default function Login() {
   return (
     <div className="login-page">
       <form className="login-form" onSubmit={handleLogin}>
-        <h1>Цифровой двойник ТЭ33А</h1>
-        <p className="login-subtitle">Locomotive Crew Alerting System</p>
-        <input
-          type="text"
-          placeholder="Логин"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoFocus
-        />
-        <input
-          type="password"
-          placeholder="Пароль"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button type="submit">Войти</button>
+        <h1>⚡ Kinetic Cockpit</h1>
+        <p className="login-subtitle">Интерфейс тепловоза v4.02</p>
+        <div>
+          <label style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--outline)", marginBottom: "0.375rem", display: "block" }}>
+            Operator Identification
+          </label>
+          <input
+            type="text"
+            placeholder="ID_ОПЕРАТОРА"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--outline)", marginBottom: "0.375rem", display: "block" }}>
+            Security Protocol Alpha
+          </label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <button type="submit">Войти в систему →</button>
         {error && <p className="login-error">{error}</p>}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.65rem", color: "var(--outline)", marginTop: "0.5rem" }}>
+          <span>Забыли пароль?</span>
+          <span style={{ color: "var(--primary)" }}>● Телеметрия активна</span>
+        </div>
       </form>
+
+      <div className="login-footer">
+        <strong>Стратегические активы КТЖ</strong><br />
+        Данный терминал предназначен только для авторизованного персонала.
+      </div>
     </div>
   );
 }

@@ -14,6 +14,7 @@ from app.simulator.router import router as simulator_router
 from app.api.auth import router as auth_router
 from app.api.routes import router as api_router
 from app.ws_hub.hub import router as ws_router
+from app.api.shift_handover import router as shift_router
 
 
 _processor_task = None
@@ -59,6 +60,7 @@ app.include_router(simulator_router)
 app.include_router(auth_router)
 app.include_router(api_router)
 app.include_router(ws_router)
+app.include_router(shift_router)
 
 
 @app.get("/health")

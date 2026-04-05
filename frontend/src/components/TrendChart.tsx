@@ -12,13 +12,13 @@ export default function TrendChart({ history, fields, height = 250 }: Props) {
     grid: { top: 30, right: 20, bottom: 30, left: 50 },
     tooltip: {
       trigger: "axis",
-      backgroundColor: "#1a2235",
-      borderColor: "#374151",
-      textStyle: { color: "#e5e7eb", fontSize: 12 },
+      backgroundColor: "#1a1d20",
+      borderColor: "rgba(138,155,137,0.15)",
+      textStyle: { color: "#e1e3de", fontSize: 11, fontFamily: "Inter" },
     },
     legend: {
       data: fields.map((f) => f.name),
-      textStyle: { color: "#9ca3af", fontSize: 11 },
+      textStyle: { color: "#bacbb9", fontSize: 10, fontFamily: "Inter" },
       top: 0,
     },
     xAxis: {
@@ -27,13 +27,13 @@ export default function TrendChart({ history, fields, height = 250 }: Props) {
         const d = new Date(h.time);
         return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}:${d.getSeconds().toString().padStart(2, "0")}`;
       }),
-      axisLabel: { color: "#6b7280", fontSize: 10 },
-      axisLine: { lineStyle: { color: "#374151" } },
+      axisLabel: { color: "#8a9b89", fontSize: 9, fontFamily: "Space Grotesk" },
+      axisLine: { lineStyle: { color: "rgba(138,155,137,0.15)" } },
     },
     yAxis: {
       type: "value",
-      axisLabel: { color: "#6b7280", fontSize: 10 },
-      splitLine: { lineStyle: { color: "#1f2937" } },
+      axisLabel: { color: "#8a9b89", fontSize: 9, fontFamily: "Space Grotesk" },
+      splitLine: { lineStyle: { color: "rgba(138,155,137,0.08)" } },
     },
     series: fields.map((f) => ({
       name: f.name,

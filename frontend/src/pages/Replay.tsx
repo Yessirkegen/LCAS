@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchTelemetryHistory } from "../services/api";
 import TrendChart from "../components/TrendChart";
-import ParamCard from "../components/ParamCard";
 
 export default function Replay() {
   const { id } = useParams<{ id: string }>();
@@ -26,10 +25,7 @@ export default function Replay() {
     if (!playing || history.length === 0) return;
     intervalRef.current = window.setInterval(() => {
       setCurrentIdx((prev) => {
-        if (prev >= history.length - 1) {
-          setPlaying(false);
-          return prev;
-        }
+        if (prev >= history.length - 1) { setPlaying(false); return prev; }
         return prev + 1;
       });
     }, 1000 / speed);
@@ -38,89 +34,123 @@ export default function Replay() {
 
   const current = history[currentIdx] || {};
   const visibleHistory = history.slice(0, currentIdx + 1);
-  const progress = history.length > 0 ? (currentIdx / (history.length - 1)) * 100 : 0;
+  const hiValue = current.health_index ?? 0;
+  const hiColor = hiValue >= 80 ? "var(--primary)" : hiValue >= 50 ? "var(--secondary-container)" : "var(--error)";
 
   return (
-    <div className="page replay-page">
-      <header className="page-header">
-        <button className="back-btn" onClick={() => navigate(-1)}>← Назад</button>
-        <h2>Replay — {id}</h2>
-        <span className="replay-badge">REPLAY MODE</span>
-      </header>
-
-      <div className="replay-controls">
-        <div className="replay-timeline">
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, history.length - 1)}
-            value={currentIdx}
-            onChange={(e) => setCurrentIdx(Number(e.target.value))}
-            className="timeline-slider"
-          />
-          <div className="timeline-labels">
-            <span>{history[0]?.time ? new Date(history[0].time).toLocaleTimeString("ru-RU") : "—"}</span>
-            <span>{current.time ? new Date(current.time).toLocaleTimeString("ru-RU") : "—"}</span>
-            <span>{history[history.length - 1]?.time ? new Date(history[history.length - 1].time).toLocaleTimeString("ru-RU") : "—"}</span>
-          </div>
-        </div>
-
-        <div className="replay-buttons">
-          <button onClick={() => setCurrentIdx(0)}>⏮</button>
-          <button onClick={() => setCurrentIdx(Math.max(0, currentIdx - 10))}>⏪</button>
-          <button onClick={() => setPlaying(!playing)} className="play-btn">
-            {playing ? "⏸" : "▶"}
-          </button>
-          <button onClick={() => setCurrentIdx(Math.min(history.length - 1, currentIdx + 10))}>⏩</button>
-          <button onClick={() => setCurrentIdx(history.length - 1)}>⏭</button>
-
-          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="speed-select">
-            <option value={1}>1x</option>
-            <option value={2}>2x</option>
-            <option value={5}>5x</option>
-          </select>
-
-          <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="period-select">
-            <option value={5}>5 мин</option>
-            <option value={15}>15 мин</option>
-            <option value={60}>1 час</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="replay-data">
-        <div className="replay-params">
-          <div className="widget">
-            <h3>Текущий кадр ({currentIdx + 1} / {history.length})</h3>
-            <div className="params-grid">
-              <ParamCard label="HI" value={current.health_index} precision={0} />
-              <ParamCard label="Скорость" value={current.speed_kmh} unit="км/ч" precision={0} />
-              <ParamCard label="Вода вых" value={current.water_temp_outlet} unit="°C" />
-              <ParamCard label="Масло вых" value={current.oil_temp_outlet} unit="°C" />
-              <ParamCard label="Давл масла" value={current.oil_pressure_kpa} unit="кПа" precision={0} />
-              <ParamCard label="Топливо" value={current.fuel_level} unit="%" />
+    <>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 1rem", background: hiValue < 50 ? "var(--error-container)" : "var(--surface-container-low)", borderRadius: "var(--radius)", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <span style={{ fontSize: "1.2rem" }}>⏪</span>
+          <div>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem", textTransform: "uppercase" }}>
+              Режим повтора{hiValue < 50 ? ": Каскадный отказ" : ""}
+            </div>
+            <div style={{ fontSize: "0.7rem", color: "var(--on-surface-variant)" }}>
+              Журнал инцидентов • {id}
             </div>
           </div>
         </div>
-
-        <div className="replay-chart widget" style={{ gridColumn: "1 / -1" }}>
-          <h3>Тренд за период</h3>
-          <TrendChart
-            history={visibleHistory.map((h) => ({
-              time: h.time,
-              health_index: h.health_index,
-              water_temp_outlet: h.water_temp_outlet,
-              oil_temp_outlet: h.oil_temp_outlet,
-            }))}
-            fields={[
-              { key: "health_index", name: "Health Index", color: "#22c55e" },
-              { key: "water_temp_outlet", name: "Темп воды", color: "#3b82f6" },
-              { key: "oil_temp_outlet", name: "Темп масла", color: "#f59e0b" },
-            ]}
-            height={250}
-          />
+        <div style={{ textAlign: "right" }}>
+          <div className="tele-label">Время воспроизведения</div>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.5rem" }}>
+            {current.time ? new Date(current.time).toLocaleTimeString("ru-RU") : "—"}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Gauges row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+        <div className="card" style={{ textAlign: "center" }}>
+          <div className="card-header">Индекс здоровья системы</div>
+          <svg viewBox="0 0 200 180" style={{ maxWidth: "180px", margin: "0 auto" }}>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="var(--surface-container-highest)" strokeWidth="10"
+              strokeDasharray={`${2 * Math.PI * 70 * 0.75} ${2 * Math.PI * 70 * 0.25}`} strokeLinecap="round" transform="rotate(135 100 100)" />
+            <circle cx="100" cy="100" r="70" fill="none" stroke={hiColor} strokeWidth="10"
+              strokeDasharray={`${(hiValue / 100) * 2 * Math.PI * 70 * 0.75} ${2 * Math.PI * 70}`}
+              strokeLinecap="round" transform="rotate(135 100 100)" style={{ transition: "stroke-dasharray 0.5s" }} />
+            <text x="100" y="95" textAnchor="middle" fill="var(--on-surface)" fontSize="42" fontWeight="700" fontFamily="Space Grotesk">{Math.round(hiValue)}</text>
+            <text x="100" y="125" textAnchor="middle" fill={hiColor} fontSize="12" fontWeight="600" fontFamily="Space Grotesk" textTransform="uppercase">
+              {hiValue >= 80 ? "Стабильно" : hiValue >= 50 ? "Внимание" : "Критический"}
+            </text>
+          </svg>
+        </div>
+
+        <div className="card" style={{ textAlign: "center" }}>
+          <div className="card-header">Скорость тепловоза</div>
+          <div className="tele-value tele-value-xl" style={{ marginTop: "1.5rem" }}>
+            {current.speed_kmh?.toFixed(1) ?? "—"}
+          </div>
+          <div className="tele-unit">MPH</div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">Параметры</div>
+          <div className="param-row"><span className="param-row-name">Вода</span><span className="param-row-value">{current.water_temp_outlet?.toFixed(0) ?? "—"}<span className="tele-unit">°C</span></span></div>
+          <div className="param-row"><span className="param-row-name">Масло</span><span className="param-row-value">{current.oil_temp_outlet?.toFixed(0) ?? "—"}<span className="tele-unit">°C</span></span></div>
+          <div className="param-row"><span className="param-row-name">Давл масла</span><span className="param-row-value">{current.oil_pressure_kpa?.toFixed(0) ?? "—"}<span className="tele-unit">кПа</span></span></div>
+          <div className="param-row"><span className="param-row-name">Топливо</span><span className="param-row-value">{current.fuel_level?.toFixed(0) ?? "—"}<span className="tele-unit">%</span></span></div>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="card chart-widget" style={{ marginBottom: "1rem" }}>
+        <TrendChart
+          history={visibleHistory.map((h) => ({
+            time: h.time,
+            health_index: h.health_index,
+            water_temp_outlet: h.water_temp_outlet,
+          }))}
+          fields={[
+            { key: "health_index", name: "Health Index", color: "#75ff9e" },
+            { key: "water_temp_outlet", name: "Темп воды", color: "#64b5f6" },
+          ]}
+          height={220}
+        />
+      </div>
+
+      {/* Timeline Controls (sticky bottom) */}
+      <div className="card" style={{ position: "sticky", bottom: 0, zIndex: 50 }}>
+        <input
+          type="range"
+          min={0}
+          max={Math.max(0, history.length - 1)}
+          value={currentIdx}
+          onChange={(e) => setCurrentIdx(Number(e.target.value))}
+          className="timeline-slider"
+        />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span className="tele-label">Скорость</span>
+            {[1, 2, 5].map((s) => (
+              <button key={s} className={`hl-btn ${speed === s ? "active" : ""}`} onClick={() => setSpeed(s)} style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}>{s}x</button>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: "0.375rem" }}>
+            <button className="scenario-btn" onClick={() => setCurrentIdx(0)} style={{ padding: "0.375rem 0.5rem" }}>⏮</button>
+            <button className="scenario-btn" onClick={() => setCurrentIdx(Math.max(0, currentIdx - 10))} style={{ padding: "0.375rem 0.5rem" }}>⏪</button>
+            <button className="btn-start" onClick={() => setPlaying(!playing)} style={{ padding: "0.375rem 1rem", fontSize: "1.2rem", background: playing ? "var(--on-surface-variant)" : undefined }}>
+              {playing ? "⏸" : "▶"}
+            </button>
+            <button className="scenario-btn" onClick={() => setCurrentIdx(Math.min(history.length - 1, currentIdx + 10))} style={{ padding: "0.375rem 0.5rem" }}>⏩</button>
+            <button className="scenario-btn" onClick={() => setCurrentIdx(history.length - 1)} style={{ padding: "0.375rem 0.5rem" }}>⏭</button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ textAlign: "right" }}>
+              <div className="tele-label">Текущее окно</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: "0.8rem" }}>
+                {history[0]?.time ? new Date(history[0].time).toLocaleTimeString("ru-RU") : "—"} - {history[history.length - 1]?.time ? new Date(history[history.length - 1].time).toLocaleTimeString("ru-RU") : "—"}
+              </div>
+            </div>
+            <button className="scenario-btn" style={{ padding: "0.375rem 0.75rem", fontSize: "0.65rem" }} onClick={() => navigate(-1)}>
+              🔒 Захват кадра
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

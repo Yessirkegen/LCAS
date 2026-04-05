@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useLCAS } from "../hooks/useLCAS";
 import { useFavicon } from "../hooks/useFavicon";
@@ -6,44 +6,53 @@ import { useHotkeys } from "../hooks/useHotkeys";
 import { useTelemetryStore } from "../stores/telemetryStore";
 import { getWsUrl } from "../services/api";
 import HealthGauge from "../components/HealthGauge";
-import ParamCard from "../components/ParamCard";
 import TrendChart from "../components/TrendChart";
 import AlertList from "../components/AlertList";
 import MasterAlerts from "../components/MasterAlerts";
 import CriticalOverlay from "../components/CriticalOverlay";
-
-const LOCO_ID = "TE33A-0142";
-
-function getParamStatus(value: number | undefined | null, warnLow: number, normLow: number, normHigh: number, warnHigh: number): "normal" | "warning" | "critical" {
-  if (value === null || value === undefined) return "normal";
-  if (value >= normLow && value <= normHigh) return "normal";
-  if (value >= warnLow && value <= warnHigh) return "warning";
-  return "critical";
-}
+import ConsistView from "../components/ConsistView";
+import ScheduleView from "../components/ScheduleView";
+import IncidentTimeline from "../components/IncidentTimeline";
+import OnboardingTour from "../components/OnboardingTour";
+import Locomotive3D from "../components/Locomotive3D";
+import DashboardCustomizer, { useDashboardPanels } from "../components/DashboardCustomizer";
+import CorrelationMatrix from "../components/CorrelationMatrix";
+import LocoPicker from "../components/LocoPicker";
 
 export default function Cabin() {
-  const { data, healthIndex, alerts, history, update } = useTelemetryStore();
+  const [locoId, setLocoId] = useState<string | null>(null);
+
+  if (!locoId) {
+    return <LocoPicker onSelect={setLocoId} />;
+  }
+
+  return <CabinDashboard locoId={locoId} onBack={() => setLocoId(null)} />;
+}
+
+function CabinDashboard({ locoId, onBack }: { locoId: string; onBack: () => void }) {
+  const { data, healthIndex, alerts, history, update, acknowledgeAll } = useTelemetryStore();
   const lcas = useLCAS();
+  const { panels, toggle: togglePanel, isVisible } = useDashboardPanels();
+  const [customizerOpen, setCustomizerOpen] = useState(false);
+
+  const handleAcknowledge = useCallback(() => {
+    lcas.acknowledgeWarning();
+    acknowledgeAll();
+  }, [lcas, acknowledgeAll]);
 
   const onMessage = useCallback((msg: any) => {
-    if (msg.type === "telemetry" && msg.locomotive_id === LOCO_ID) {
+    if (msg.type === "telemetry" && msg.locomotive_id === locoId) {
       update(msg);
     }
-  }, [update]);
+  }, [update, locoId]);
 
-  const { status } = useWebSocket({
-    url: getWsUrl(LOCO_ID),
-    onMessage,
-  });
+  const { status } = useWebSocket({ url: getWsUrl(locoId), onMessage });
 
-  useEffect(() => {
-    lcas.processAlerts(alerts);
-  }, [alerts]);
-
-  useFavicon(healthIndex?.value ?? null, healthIndex?.category ?? "normal", LOCO_ID);
+  useEffect(() => { lcas.processAlerts(alerts); }, [alerts]);
+  useFavicon(healthIndex?.value ?? null, healthIndex?.category ?? "normal", locoId);
 
   const hotkeys = useMemo(() => ({
-    " ": () => lcas.acknowledgeWarning(),
+    " ": () => handleAcknowledge(),
     "d": () => document.documentElement.classList.toggle("light-theme"),
     "m": () => lcas.toggleSound(),
   }), [lcas]);
@@ -53,113 +62,216 @@ export default function Cabin() {
   const d = data;
 
   return (
-    <div className="page cabin-page">
-      <header className="page-header">
-        <h2>Кабина — {LOCO_ID}</h2>
-        <span className={`status-badge ${status === "online" ? "online" : "offline"}`}>
-          {status === "online" ? "● Online" : status === "reconnecting" ? "◌ Переподключение..." : "○ Offline"}
-        </span>
-      </header>
+    <>
+      <OnboardingTour onComplete={() => {}} />
+      <DashboardCustomizer panels={panels} onToggle={togglePanel} open={customizerOpen} onClose={() => setCustomizerOpen(false)} />
+      <CriticalOverlay alerts={alerts} onAcknowledge={handleAcknowledge} />
+
+      <div className="page-header" style={{ marginBottom: "1rem" }}>
+        <div>
+          <div className="page-title" style={{ fontSize: "1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <span>Индекс здоровья (HI)</span>
+            <span className={`status-badge status-badge-${hi?.category || "normal"}`}>
+              {hi?.category === "normal" ? "NORMAL" : hi?.category === "attention" ? "ВНИМАНИЕ" : "КРИТИЧНО"}
+            </span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <button className="scenario-btn" onClick={onBack} style={{ padding: "0.3rem 0.6rem", fontSize: "0.7rem" }}>← Сменить</button>
+          <button className="scenario-btn" onClick={() => setCustomizerOpen(true)} style={{ padding: "0.3rem 0.5rem", fontSize: "0.9rem" }}>⚙</button>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: "0.7rem", color: "var(--on-surface-variant)" }}>
+            Кабина: {locoId}
+          </span>
+          <span className={`status-badge ${status === "online" ? "online" : "offline"}`} style={{ fontFamily: "var(--font-display)", fontSize: "0.65rem", letterSpacing: "0.05em" }}>
+            {status === "online" ? "● ONLINE" : status === "reconnecting" ? "◌ RECONNECT..." : "○ OFFLINE"}
+          </span>
+        </div>
+      </div>
 
       <MasterAlerts
         masterWarning={lcas.masterWarning}
         masterCaution={lcas.masterCaution}
         soundEnabled={lcas.soundEnabled}
-        onAckWarning={lcas.acknowledgeWarning}
+        onAckWarning={handleAcknowledge}
         onAckCaution={lcas.acknowledgeCaution}
         onToggleSound={lcas.toggleSound}
       />
 
-      <CriticalOverlay alerts={alerts} onAcknowledge={lcas.acknowledgeWarning} />
-
       {status === "reconnecting" && (
-        <div className="connection-banner">Соединение потеряно. Переподключение...</div>
+        <div className="connection-banner">[!] Соединение потеряно. Переподключение...</div>
       )}
 
-      <main className="cabin-grid">
-        <div className="widget hi-widget">
-          <h3>Индекс здоровья</h3>
+      {/* Row 1: HI + Top5 | Master Alert | Speed */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">◉</span> Индекс здоровья (HI)</div>
           {hi ? (
-            <HealthGauge
-              value={hi.value}
-              letter={hi.letter}
-              category={hi.category}
-              topFactors={hi.top_factors}
-              predictedMinutes={hi.predicted_minutes_to_critical}
-            />
+            <div style={{ display: "flex", gap: "1.5rem", alignItems: "flex-start" }}>
+              <HealthGauge value={hi.value} letter={hi.letter} category={hi.category} topFactors={hi.top_factors} predictedMinutes={hi.predicted_minutes_to_critical} />
+              <div style={{ flex: 1 }}>
+                <div className="tele-label">ТОП-5 ФАКТОРОВ</div>
+                {hi.top_factors?.slice(0, 4).map((f, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "0.25rem 0", fontSize: "0.75rem", borderBottom: "1px solid var(--outline-variant)" }}>
+                    <span style={{ color: "var(--on-surface-variant)" }}>{f.param.replace(/_/g, " ")}</span>
+                    <span style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}>{f.value?.toFixed?.(0) ?? "—"}°</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
-            <div className="hi-value">—</div>
+            <div className="tele-value tele-value-xl" style={{ textAlign: "center", padding: "2rem" }}>—</div>
           )}
         </div>
 
-        <div className="widget speed-widget">
-          <h3>Скорость</h3>
-          <div className="speed-value">{d?.speed_kmh?.toFixed(0) ?? "—"}<span className="speed-unit"> км/ч</span></div>
-          {d?.wheel_slip && <div className="wheel-slip-indicator">БОКСОВАНИЕ</div>}
-        </div>
-
-        <div className="widget alerts-widget">
-          <h3>Алерты</h3>
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">⚠</span> Главный алерт</div>
           <AlertList alerts={alerts} />
-        </div>
-
-        <div className="widget params-widget">
-          <h3>Температуры</h3>
-          <div className="params-grid">
-            <ParamCard label="Вода вх" value={d?.water_temp_inlet} unit="°C" status={getParamStatus(d?.water_temp_inlet, 60, 71, 91, 100)} />
-            <ParamCard label="Вода вых" value={d?.water_temp_outlet} unit="°C" status={getParamStatus(d?.water_temp_outlet, 60, 71, 91, 100)} />
-            <ParamCard label="Масло вх" value={d?.oil_temp_inlet} unit="°C" status={getParamStatus(d?.oil_temp_inlet, 60, 72, 85, 90)} />
-            <ParamCard label="Масло вых" value={d?.oil_temp_outlet} unit="°C" status={getParamStatus(d?.oil_temp_outlet, 60, 72, 85, 90)} />
-            <ParamCard label="Возд колл" value={d?.air_temp_collector} unit="°C" precision={0} />
-            <ParamCard label="Топливо" value={d?.fuel_temp} unit="°C" />
+          <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
+            <button className="scenario-btn" style={{ flex: 1, background: d?.wheel_slip ? "var(--secondary-container)" : undefined, color: d?.wheel_slip ? "var(--on-primary)" : undefined }}>
+              Боксование {d?.wheel_slip ? "🔴" : "OFF"}
+            </button>
+            <button className="scenario-btn" style={{ flex: 1 }}>Автопилот OFF</button>
           </div>
         </div>
 
-        <div className="widget params-widget">
-          <h3>Давления</h3>
-          <div className="params-grid">
-            <ParamCard label="Вода" value={d?.water_pressure_kpa} unit="кПа" precision={0} status={getParamStatus(d?.water_pressure_kpa, 15, 28, 365, 400)} />
-            <ParamCard label="Масло" value={d?.oil_pressure_kpa} unit="кПа" precision={0} status={getParamStatus(d?.oil_pressure_kpa, 100, 179, 765, 800)} />
-            <ParamCard label="Воздух" value={d?.air_pressure_kpa} unit="кПа" precision={0} />
-            <ParamCard label="Расход" value={d?.air_consumption} unit="" precision={0} />
-            <ParamCard label="ГР" value={d?.main_reservoir_pressure} unit="кгс" precision={2} status={getParamStatus(d?.main_reservoir_pressure, 7.0, 7.5, 9.5, 10.0)} />
-            <ParamCard label="ТМ" value={d?.brake_line_pressure} unit="кгс" precision={2} />
+        <div className="card" style={{ textAlign: "center" }}>
+          <div className="card-header"><span className="card-header-icon">⟐</span> Текущая скорость</div>
+          <div className="tele-value tele-value-xl" style={{ marginTop: "0.5rem" }}>
+            {d?.speed_kmh?.toFixed(1) ?? "—"}
+          </div>
+          <div className="tele-unit">km/h</div>
+          {d?.wheel_slip && <div className="wheel-slip-indicator" style={{ marginTop: "0.75rem" }}>Боксование</div>}
+        </div>
+      </div>
+
+      {/* Row 2: Temperatures | Pressures | Electrical | Fuel */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">🌡</span> Температуры</div>
+          <div className="param-row"><span className="param-row-name">Вода вх/вых</span><span className="param-row-value">{d?.water_temp_inlet?.toFixed(0) ?? "—"} / {d?.water_temp_outlet?.toFixed(0) ?? "—"}<span className="tele-unit">°C</span></span></div>
+          <div className="param-row"><span className="param-row-name">Масло вх/вых</span><span className="param-row-value">{d?.oil_temp_inlet?.toFixed(0) ?? "—"} / {d?.oil_temp_outlet?.toFixed(0) ?? "—"}<span className="tele-unit">°C</span></span></div>
+          <div className="param-row"><span className="param-row-name">Воздухосборник</span><span className="param-row-value">{d?.air_temp_collector?.toFixed(0) ?? "—"}<span className="tele-unit">Pa</span></span></div>
+          <div className="param-row"><span className="param-row-name">Темп. топлива</span><span className="param-row-value">{d?.fuel_temp?.toFixed(0) ?? "—"}<span className="tele-unit">°C</span></span></div>
+        </div>
+
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">⚙</span> Давления</div>
+          <div className="param-row"><span className="param-row-name">Вода</span><span className="param-row-value">{d?.water_pressure_kpa?.toFixed(0) ?? "—"}<span className="tele-unit">кПа</span></span></div>
+          <div className="param-row"><span className="param-row-name">Масло</span><span className="param-row-value">{d?.oil_pressure_kpa?.toFixed(0) ?? "—"}<span className="tele-unit">кПа</span></span></div>
+          <div className="param-row"><span className="param-row-name">Воздух</span><span className="param-row-value">{d?.air_pressure_kpa?.toFixed(0) ?? "—"}<span className="tele-unit">кПа</span></span></div>
+          <div className="param-row"><span className="param-row-name">ГР</span><span className="param-row-value">{d?.main_reservoir_pressure?.toFixed(1) ?? "—"}<span className="tele-unit">bar</span></span></div>
+          <div className="param-row"><span className="param-row-name">ТМ</span><span className="param-row-value">{d?.brake_line_pressure?.toFixed(1) ?? "—"}<span className="tele-unit">bar</span></span></div>
+          <div className="param-row"><span className="param-row-name">Воздух</span><span className="param-row-value">{d?.air_consumption?.toFixed(0) ?? "—"}</span></div>
+        </div>
+
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">⚡</span> Электрика</div>
+          <div className="param-row"><span className="param-row-name">Ток тяги</span><span className="param-row-value" style={{ color: (d?.traction_current ?? 0) > 800 ? "var(--secondary-container)" : undefined }}>{d?.traction_current?.toFixed(0) ?? "—"}<span className="tele-unit">A</span></span></div>
+          <div className="param-row"><span className="param-row-name">Генератор</span><span className="param-row-value">{d?.generator_voltage?.toFixed(0) ?? "—"}<span className="tele-unit">V</span> / {d?.generator_current?.toFixed(0) ?? "—"}<span className="tele-unit">A</span></span></div>
+          <div className="param-row">
+            <span className="param-row-name">GF 1</span>
+            <span className="param-row-value" style={{ color: d?.ground_fault_power ? "var(--error)" : "var(--primary)" }}>{d?.ground_fault_power ? "FAULT" : "OK"}</span>
+          </div>
+          <div className="param-row">
+            <span className="param-row-name">GF 2</span>
+            <span className="param-row-value" style={{ color: d?.ground_fault_aux ? "var(--error)" : "var(--primary)" }}>{d?.ground_fault_aux ? "FAULT" : "OK"}</span>
           </div>
         </div>
 
-        <div className="widget params-widget">
-          <h3>Электрика</h3>
-          <div className="params-grid">
-            <ParamCard label="Тяга" value={d?.traction_current} unit="А" precision={0} status={getParamStatus(d?.traction_current, 0, 0, 800, 900)} />
-            <ParamCard label="Усилие" value={d?.traction_effort} unit="кН" precision={0} />
-            <ParamCard label="Ген В" value={d?.generator_voltage} unit="В" precision={0} />
-            <ParamCard label="Ген А" value={d?.generator_current} unit="А" precision={0} />
-            <ParamCard label="Зазем сил" value={d?.ground_fault_power} status={d?.ground_fault_power ? "critical" : "normal"} />
-            <ParamCard label="Зазем всп" value={d?.ground_fault_aux} status={d?.ground_fault_aux ? "critical" : "normal"} />
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">⛽</span> Топливо</div>
+          <div className="tele-label">Текущий уровень</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <span className="tele-value tele-value-md" style={{ color: (d?.fuel_level ?? 100) < 20 ? "var(--secondary-container)" : undefined }}>{d?.fuel_level?.toFixed(0) ?? "—"}</span>
+            <span className="tele-unit">%</span>
+          </div>
+          <div style={{ height: "6px", background: "var(--surface-container-highest)", borderRadius: "3px", overflow: "hidden", marginBottom: "1rem" }}>
+            <div style={{ height: "100%", width: `${d?.fuel_level ?? 0}%`, background: (d?.fuel_level ?? 100) < 20 ? "var(--secondary-container)" : "var(--primary)", borderRadius: "3px", transition: "width 0.5s" }} />
+          </div>
+          <div className="tele-label">Расход</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
+            <span className="tele-value tele-value-md">{d?.fuel_consumption?.toFixed(0) ?? "—"}</span>
+            <span className="tele-unit">L/h</span>
           </div>
         </div>
+      </div>
 
-        <div className="widget params-widget">
-          <h3>Топливо</h3>
-          <div className="params-grid">
-            <ParamCard label="Уровень" value={d?.fuel_level} unit="%" status={getParamStatus(d?.fuel_level, 5, 10, 100, 101)} />
-            <ParamCard label="Расход" value={d?.fuel_consumption} unit="л/ч" precision={0} />
+      {/* Row 3: Trends + Route Progress */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+        <div className="card chart-widget">
+          <div className="card-header">
+            <span className="card-header-icon">📈</span> Тренд
+            <div style={{ marginLeft: "auto", display: "flex", gap: "0.25rem" }}>
+              <button className="scenario-btn" style={{ padding: "0.25rem 0.5rem", fontSize: "0.6rem" }}>1 MIN</button>
+              <button className="scenario-btn" style={{ padding: "0.25rem 0.5rem", fontSize: "0.6rem", borderColor: "var(--primary)", color: "var(--primary)" }}>5 MIN</button>
+              <button className="scenario-btn" style={{ padding: "0.25rem 0.5rem", fontSize: "0.6rem" }}>15 MIN</button>
+            </div>
           </div>
-        </div>
-
-        <div className="widget chart-widget" style={{ gridColumn: "1 / -1" }}>
-          <h3>Тренды</h3>
           <TrendChart
             history={history}
             fields={[
-              { key: "health_index", name: "Health Index", color: "#22c55e" },
-              { key: "water_temp_outlet", name: "Темп воды (вых)", color: "#3b82f6" },
-              { key: "oil_temp_outlet", name: "Темп масла (вых)", color: "#f59e0b" },
+              { key: "health_index", name: "Health Index", color: "#75ff9e" },
+              { key: "water_temp_outlet", name: "Темп воды", color: "#64b5f6" },
+              { key: "oil_temp_outlet", name: "Темп масла", color: "#fdd400" },
             ]}
-            height={280}
+            height={250}
           />
         </div>
-      </main>
-    </div>
+
+        <div className="card">
+          <div className="card-header"><span className="card-header-icon">📍</span> Прогресс маршрута</div>
+          <ScheduleView locoId={locoId} />
+        </div>
+      </div>
+
+      {/* Row 4: 3D Model + Correlation */}
+      {(isVisible("loco3d") || isVisible("correlation")) && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+          {isVisible("loco3d") && (
+            <div className="card">
+              <div className="card-header"><span className="card-header-icon">🏗</span> 3D-модель ТЭ33А</div>
+              <Locomotive3D
+                healthIndex={hi?.value ?? 100}
+                category={hi?.category ?? "normal"}
+                waterTemp={d?.water_temp_outlet ?? null}
+                oilTemp={d?.oil_temp_outlet ?? null}
+                tractionCurrent={d?.traction_current ?? null}
+                groundFault={d?.ground_fault_power ?? false}
+                fuelLevel={d?.fuel_level ?? null}
+              />
+            </div>
+          )}
+          {isVisible("correlation") && (
+            <div className="card">
+              <div className="card-header"><span className="card-header-icon">📊</span> Корреляция параметров</div>
+              <CorrelationMatrix history={history} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Row 5: Consist + Events */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        {isVisible("consist") && (
+          <div className="card">
+            <div className="card-header"><span className="card-header-icon">🚂</span> Состав</div>
+            <ConsistView locoId={locoId} />
+          </div>
+        )}
+        {isVisible("events") && (
+          <div className="card">
+            <div className="card-header"><span className="card-header-icon">📋</span> Журнал событий</div>
+            <IncidentTimeline locoId={locoId} />
+          </div>
+        )}
+      </div>
+
+      {/* Status Bar */}
+      <div style={{ display: "flex", gap: "2rem", padding: "0.75rem 0", marginTop: "1rem", fontSize: "0.65rem", color: "var(--outline)", fontFamily: "var(--font-display)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        <span>● Связь с системой: {status === "online" ? "активно" : "потеряно"}</span>
+        <span>● GPS: захвачен</span>
+        <span style={{ marginLeft: "auto" }}>Оператор: {localStorage.getItem("username") || "DRV_ALEX_V"}</span>
+      </div>
+    </>
   );
 }

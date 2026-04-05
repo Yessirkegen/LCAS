@@ -1,0 +1,16 @@
+{
+  "name": "Locomotive Digital Twin — LCAS",
+  "short_name": "LCAS",
+  "description": "Цифровой двойник локомотива ТЭ33А с индексом здоровья",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

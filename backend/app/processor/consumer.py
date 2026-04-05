@@ -15,6 +15,12 @@ from app.services.database import async_session
 from app.processor.health_index import compute_health_index
 from app.processor.alerts import detect_alerts
 from app.processor.edge_cases import detect_stuck_sensors, detect_cold_start, check_warning_escalation
+from app.processor.anomaly import detect_anomalies
+from app.processor.fuel_efficiency import update_fuel_data, compute_fuel_efficiency
+from app.processor.data_quality import compute_data_quality
+from app.processor.incident_timeline import log_event, start_incident, get_active_incident
+from app.services.circuit_breaker import db_circuit_breaker
+from app.services.tracing import Trace
 
 logger = logging.getLogger(__name__)
 
@@ -158,10 +164,15 @@ async def _flush_to_db():
 async def _db_flusher():
     while True:
         await asyncio.sleep(FLUSH_INTERVAL)
+        if not db_circuit_breaker.can_execute():
+            logger.warning("Circuit breaker OPEN — skipping DB write")
+            continue
         try:
             await _flush_to_db()
+            db_circuit_breaker.record_success()
         except Exception as e:
-            logger.error(f"DB flush error: {e}")
+            db_circuit_breaker.record_failure()
+            logger.error(f"DB flush error (circuit breaker: {db_circuit_breaker.state}): {e}")
 
 
 async def run_processor():
@@ -184,8 +195,11 @@ async def run_processor():
         async for msg in consumer:
             data = msg.value
             loco_id = data.get("locomotive_id", "unknown")
+            trace = Trace()
+            trace.span("kafka_received")
 
             smoothed = _apply_ema(loco_id, data)
+            trace.span("ema_applied")
 
             hi_result = compute_health_index(smoothed, _thresholds, _weights, _penalties)
 
@@ -236,7 +250,44 @@ async def run_processor():
                 if k.startswith(f"{loco_id}:")
             ]
 
+            anomalies = detect_anomalies(loco_id, smoothed)
+            for anom in anomalies:
+                anom_key = f"{loco_id}:anomaly_{anom['param']}"
+                if anom_key not in _active_alerts:
+                    _active_alerts[anom_key] = {
+                        "id": f"anom-{anom['param'][:6]}",
+                        "locomotive_id": loco_id,
+                        "timestamp": data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                        "level": "CAUTION",
+                        "param": f"anomaly_{anom['param']}",
+                        "message": anom["message"],
+                        "voice_text": f"АНОМАЛИЯ. {anom['param'].upper().replace('_',' ')}",
+                        "status": "active",
+                    }
+
+            update_fuel_data(loco_id, smoothed.get("speed_kmh"), smoothed.get("fuel_consumption"))
+            fuel_eff = compute_fuel_efficiency(loco_id, smoothed.get("speed_kmh"), smoothed.get("fuel_consumption"))
+            if fuel_eff:
+                hi_result["fuel_efficiency"] = fuel_eff
+
+            dq = compute_data_quality(loco_id, smoothed)
+            hi_result["data_quality"] = dq.get("_overall", 100)
+
+            log_event(loco_id, "telemetry", f"HI={hi_result['value']}", {"speed": smoothed.get("speed_kmh")})
+            for alert in new_alerts:
+                log_event(loco_id, "alert", alert.get("message", ""), {"level": alert["level"]})
+                if alert["level"] == "WARNING" and not get_active_incident(loco_id):
+                    start_incident(loco_id, alert)
+
+            current_alerts = [
+                a for k, a in _active_alerts.items()
+                if k.startswith(f"{loco_id}:")
+            ]
+
+            trace.span("processing_done")
             await _publish_to_redis(loco_id, smoothed, hi_result, current_alerts)
+            trace.span("redis_published")
+            trace.finish()
 
             ts_raw = data.get("timestamp")
             if isinstance(ts_raw, str):
