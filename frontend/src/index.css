@@ -326,9 +326,15 @@ body {
 .status-badge-critical { background: var(--error-container); color: var(--error); }
 
 /* ═══ Health Index Gauge ═══ */
-.hi-gauge-container { text-align: center; }
+.hi-gauge-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
 
-.hi-gauge-svg { max-width: 220px; margin: 0 auto; display: block; }
+.hi-gauge-svg { margin: 0 auto; display: block; }
 
 .hi-number {
   font-family: var(--font-display);
@@ -344,20 +350,24 @@ body {
 }
 
 .hi-prediction {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--secondary-container);
   margin-top: 0.5rem;
   text-align: center;
 }
 
-.hi-factors { margin-top: 0.75rem; }
+.hi-factors {
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 300px;
+}
 
 .hi-factor-row {
   display: flex;
   justify-content: space-between;
-  padding: 0.3rem 0;
-  font-size: 0.7rem;
+  padding: 0.35rem 0;
+  font-size: 0.8rem;
   border-bottom: 1px solid var(--outline-variant);
 }
 

@@ -1,36 +1,6 @@
 import { create } from "zustand";
 
 interface TelemetryData {
-  locomotive_id: string;
-  speed_kmh: number;
-  health_index: number;
-  hi_letter: string;
-  hi_category: string;
-  water_temp_inlet: number;
-  water_temp_outlet: number;
-  oil_temp_inlet: number;
-  oil_temp_outlet: number;
-  air_temp_collector: number;
-  fuel_temp: number;
-  water_pressure_kpa: number;
-  oil_pressure_kpa: number;
-  air_pressure_kpa: number;
-  air_consumption: number;
-  main_reservoir_pressure: number;
-  brake_line_pressure: number;
-  compressor_active: boolean;
-  traction_current: number;
-  traction_effort: number;
-  ground_fault_power: boolean;
-  ground_fault_aux: boolean;
-  generator_voltage: number;
-  generator_current: number;
-  fuel_level: number;
-  fuel_consumption: number;
-  lat: number;
-  lon: number;
-  wheel_slip: boolean;
-  timestamp: string;
   [key: string]: any;
 }
 
@@ -38,13 +8,7 @@ interface HealthIndex {
   value: number;
   letter: string;
   category: string;
-  top_factors: Array<{
-    param: string;
-    value: number;
-    score: number;
-    weight: number;
-    impact: number;
-  }>;
+  top_factors: Array<{ param: string; value: number; score: number; weight: number; impact: number }>;
   penalties_applied: Array<{ event: string; penalty: number }>;
   predicted_minutes_to_critical?: number;
 }
@@ -73,11 +37,35 @@ interface TelemetryStore {
   alerts: Alert[];
   acknowledgedParams: Set<string>;
   history: HistoryPoint[];
-  maxHistory: number;
 
   update: (msg: any) => void;
+  setInitial: (state: any, health: any, alerts: any[]) => void;
   acknowledgeAll: () => void;
   clearHistory: () => void;
+}
+
+const MAX_HISTORY = 300;
+const HISTORY_FIELDS = [
+  "speed_kmh", "water_temp_inlet", "water_temp_outlet",
+  "oil_temp_inlet", "oil_temp_outlet", "water_pressure_kpa",
+  "oil_pressure_kpa", "main_reservoir_pressure", "brake_line_pressure",
+  "traction_current", "generator_voltage", "fuel_level",
+  "fuel_consumption", "catenary_voltage", "pantograph_current",
+  "inverter_temp", "ted_avg_temp", "ted_max_temp",
+  "cooling_water_temp", "regen_power_kw",
+];
+
+let _pendingMsg: any = null;
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+const THROTTLE_MS = 400;
+
+function buildHistoryPoint(d: any, hi: any): HistoryPoint {
+  const pt: HistoryPoint = { time: d.timestamp || new Date().toISOString(), health_index: hi?.value };
+  for (let i = 0; i < HISTORY_FIELDS.length; i++) {
+    const k = HISTORY_FIELDS[i];
+    if (d[k] != null) pt[k] = d[k];
+  }
+  return pt;
 }
 
 export const useTelemetryStore = create<TelemetryStore>((set, get) => ({
@@ -86,47 +74,50 @@ export const useTelemetryStore = create<TelemetryStore>((set, get) => ({
   alerts: [],
   acknowledgedParams: new Set<string>(),
   history: [],
-  maxHistory: 300,
+
+  setInitial: (state: any, health: any, alerts: any[]) => {
+    const hist: HistoryPoint[] = [];
+    if (state) hist.push(buildHistoryPoint(state, health));
+    set({
+      data: state || null,
+      healthIndex: health || null,
+      alerts: alerts || [],
+      history: hist,
+    });
+  },
 
   update: (msg: any) => {
-    if (msg.type === "telemetry") {
+    if (msg.type !== "telemetry") return;
+    _pendingMsg = msg;
+
+    if (_flushTimer) return;
+    _flushTimer = setTimeout(() => {
+      _flushTimer = null;
+      const m = _pendingMsg;
+      if (!m) return;
+      _pendingMsg = null;
+
       const state = get();
       const acked = state.acknowledgedParams;
+      const incoming: Alert[] = m.alerts || [];
 
-      const incomingAlerts: Alert[] = msg.alerts || [];
+      const merged = incoming.length > 0
+        ? incoming.map((a: Alert) => acked.has(a.param) ? { ...a, status: "acknowledged" } : a)
+        : state.alerts;
 
-      const merged = incomingAlerts.map((a) => {
-        if (acked.has(a.param)) {
-          return { ...a, status: "acknowledged" };
-        }
-        return a;
-      });
-
-      const stillActive = incomingAlerts.some((a) => a.level === "WARNING" && !acked.has(a.param));
-      const resolvedParams = new Set(incomingAlerts.map((a) => a.param));
-      const cleanedAcked = new Set([...acked].filter((p) => resolvedParams.has(p)));
-
-      const newHistory = [
-        ...state.history.slice(-(state.maxHistory - 1)),
-        {
-          time: msg.data?.timestamp || new Date().toISOString(),
-          health_index: msg.health_index?.value,
-          speed: msg.data?.speed_kmh,
-          water_temp_outlet: msg.data?.water_temp_outlet,
-          oil_temp_outlet: msg.data?.oil_temp_outlet,
-          oil_pressure_kpa: msg.data?.oil_pressure_kpa,
-          fuel_level: msg.data?.fuel_level,
-        },
-      ];
+      const d = m.data || {};
+      const pt = buildHistoryPoint(d, m.health_index);
+      const hist = state.history.length >= MAX_HISTORY
+        ? [...state.history.slice(-(MAX_HISTORY - 1)), pt]
+        : [...state.history, pt];
 
       set({
-        data: msg.data || state.data,
-        healthIndex: msg.health_index || state.healthIndex,
+        data: m.data || state.data,
+        healthIndex: m.health_index || state.healthIndex,
         alerts: merged,
-        acknowledgedParams: cleanedAcked,
-        history: newHistory,
+        history: hist,
       });
-    }
+    }, THROTTLE_MS);
   },
 
   acknowledgeAll: () => {

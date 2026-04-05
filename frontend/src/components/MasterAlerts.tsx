@@ -22,7 +22,7 @@ export default function MasterAlerts({
         onClick={onAckWarning}
         disabled={!masterWarning}
       >
-        MASTER WARNING
+        ГЛАВНОЕ ПРЕДУПРЕЖДЕНИЕ
       </button>
 
       <button
@@ -30,7 +30,7 @@ export default function MasterAlerts({
         onClick={onAckCaution}
         disabled={!masterCaution}
       >
-        MASTER CAUTION
+        ВНИМАНИЕ
       </button>
 
       <button className={`sound-toggle ${soundEnabled ? "on" : "off"}`} onClick={onToggleSound}>

@@ -13,7 +13,7 @@ const ACTIONS = [
   { id: "admin", label: "Администрирование", path: "/admin" },
   { id: "simulator", label: "Симулятор", path: "/simulator" },
   { id: "thresholds", label: "Настройка порогов", path: "/admin" },
-  { id: "docs", label: "API Documentation", path: "http://localhost:8000/docs" },
+  { id: "docs", label: "Документация API", path: "http://localhost:8000/docs" },
 ];
 
 export default function CommandPalette({ open, onClose, locomotives }: Props) {
@@ -59,7 +59,7 @@ export default function CommandPalette({ open, onClose, locomotives }: Props) {
       <div className="cmd-palette" onClick={(e) => e.stopPropagation()}>
         <input
           className="cmd-input"
-          placeholder="Поиск локомотива, страницы, действия..."
+          placeholder="Поиск локомотива, страницы..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
@@ -68,6 +68,7 @@ export default function CommandPalette({ open, onClose, locomotives }: Props) {
           {locoResults.length > 0 && (
             <div className="cmd-group">
               <div className="cmd-group-label">Локомотивы</div>
+
               {locoResults.map((l) => (
                 <div
                   key={l.locomotive_id}
@@ -83,7 +84,7 @@ export default function CommandPalette({ open, onClose, locomotives }: Props) {
           )}
           {actionResults.length > 0 && (
             <div className="cmd-group">
-              <div className="cmd-group-label">Действия</div>
+              <div className="cmd-group-label">Страницы</div>
               {actionResults.map((a) => (
                 <div key={a.id} className="cmd-item" onClick={() => handleSelect(a.path)}>
                   <span>{a.label}</span>
@@ -92,7 +93,7 @@ export default function CommandPalette({ open, onClose, locomotives }: Props) {
             </div>
           )}
           {locoResults.length === 0 && actionResults.length === 0 && (
-            <div className="cmd-empty">Ничего не найдено</div>
+            <div className="cmd-empty">Не найдено</div>
           )}
         </div>
       </div>

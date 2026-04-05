@@ -1,7 +1,7 @@
 {
-  "name": "Locomotive Digital Twin — LCAS",
+  "name": "LCAS — Locomotive Crew Alerting System",
   "short_name": "LCAS",
-  "description": "Цифровой двойник локомотива ТЭ33А с индексом здоровья",
+  "description": "LCAS — система мониторинга и оповещения экипажа локомотива",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0e17",

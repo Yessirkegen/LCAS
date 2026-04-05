@@ -103,7 +103,7 @@ export default function Replay() {
             water_temp_outlet: h.water_temp_outlet,
           }))}
           fields={[
-            { key: "health_index", name: "Health Index", color: "#75ff9e" },
+            { key: "health_index", name: "Индекс здоровья", color: "#75ff9e" },
             { key: "water_temp_outlet", name: "Темп воды", color: "#64b5f6" },
           ]}
           height={220}

@@ -41,8 +41,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Locomotive Digital Twin — LCAS",
-    description="Цифровой двойник локомотива ТЭ33А с индексом здоровья и LCAS",
+    title="LCAS — Locomotive Crew Alerting System",
+    description="LCAS — система мониторинга и оповещения экипажа локомотива",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -67,6 +67,6 @@ app.include_router(shift_router)
 async def health_check():
     return {
         "status": "ok",
-        "service": "locomotive-digital-twin",
+        "service": "lcas",
         "version": "0.1.0",
     }

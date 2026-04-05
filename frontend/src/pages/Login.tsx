@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" ? `${window.location.protocol}//${window.location.host}` : "http://localhost:8000");
 
 export default function Login() {
   const navigate = useNavigate();
@@ -41,11 +41,11 @@ export default function Login() {
   return (
     <div className="login-page">
       <form className="login-form" onSubmit={handleLogin}>
-        <h1>⚡ Kinetic Cockpit</h1>
-        <p className="login-subtitle">Интерфейс тепловоза v4.02</p>
+        <h1>⚡ LCAS</h1>
+        <p className="login-subtitle">Locomotive Crew Alerting System</p>
         <div>
           <label style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--outline)", marginBottom: "0.375rem", display: "block" }}>
-            Operator Identification
+            Идентификация оператора
           </label>
           <input
             type="text"
@@ -57,7 +57,7 @@ export default function Login() {
         </div>
         <div>
           <label style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--outline)", marginBottom: "0.375rem", display: "block" }}>
-            Security Protocol Alpha
+            Протокол безопасности
           </label>
           <input
             type="password"
@@ -75,7 +75,7 @@ export default function Login() {
       </form>
 
       <div className="login-footer">
-        <strong>Стратегические активы КТЖ</strong><br />
+        <strong>LCAS — Locomotive Crew Alerting System</strong><br />
         Данный терминал предназначен только для авторизованного персонала.
       </div>
     </div>

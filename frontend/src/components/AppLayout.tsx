@@ -4,50 +4,50 @@ import { useTelemetryStore } from "../stores/telemetryStore";
 
 const ROLE_NAV: Record<string, Array<{ path: string; label: string }>> = {
   driver: [
-    { path: "/cabin", label: "Cabin" },
+    { path: "/cabin", label: "Кабина" },
   ],
   dispatcher: [
-    { path: "/cabin", label: "Cabin" },
-    { path: "/dispatch", label: "Fleet" },
+    { path: "/cabin", label: "Кабина" },
+    { path: "/dispatch", label: "Флот" },
   ],
   admin: [
-    { path: "/cabin", label: "Cabin" },
-    { path: "/dispatch", label: "Fleet" },
-    { path: "/simulator", label: "Simulator" },
-    { path: "/admin", label: "Admin" },
-    { path: "/dashboard", label: "System" },
+    { path: "/cabin", label: "Кабина" },
+    { path: "/dispatch", label: "Флот" },
+    { path: "/simulator", label: "Симулятор" },
+    { path: "/admin", label: "Админ" },
+    { path: "/dashboard", label: "Система" },
   ],
   simulator: [
-    { path: "/cabin", label: "Cabin" },
-    { path: "/dispatch", label: "Fleet" },
-    { path: "/simulator", label: "Simulator" },
-    { path: "/admin", label: "Admin" },
-    { path: "/dashboard", label: "System" },
+    { path: "/cabin", label: "Кабина" },
+    { path: "/dispatch", label: "Флот" },
+    { path: "/simulator", label: "Симулятор" },
+    { path: "/admin", label: "Админ" },
+    { path: "/dashboard", label: "Система" },
   ],
 };
 
 const ROLE_SIDEBAR: Record<string, Array<{ path: string; label: string; icon: string }>> = {
   driver: [
-    { path: "/cabin", label: "Dashboard", icon: "📊" },
+    { path: "/cabin", label: "Дашборд", icon: "📊" },
   ],
   dispatcher: [
-    { path: "/cabin", label: "Dashboard", icon: "📊" },
-    { path: "/dispatch", label: "Fleet Overview", icon: "🚂" },
-    { path: "/dispatch/loco/TE33A-0142/replay", label: "Replay", icon: "⏪" },
+    { path: "/cabin", label: "Дашборд", icon: "📊" },
+    { path: "/dispatch", label: "Обзор флота", icon: "🚂" },
+    { path: "/dispatch/loco/TE33A-0142/replay", label: "Повтор", icon: "⏪" },
   ],
   admin: [
-    { path: "/cabin", label: "Dashboard", icon: "📊" },
-    { path: "/admin", label: "Diagnostics", icon: "🔧" },
-    { path: "/dispatch", label: "Fleet Overview", icon: "🚂" },
-    { path: "/dispatch/loco/TE33A-0142/replay", label: "Replay", icon: "⏪" },
-    { path: "/simulator", label: "Simulation", icon: "⚡" },
-    { path: "/dashboard", label: "System Health", icon: "📋" },
+    { path: "/cabin", label: "Дашборд", icon: "📊" },
+    { path: "/admin", label: "Диагностика", icon: "🔧" },
+    { path: "/dispatch", label: "Обзор флота", icon: "🚂" },
+    { path: "/dispatch/loco/TE33A-0142/replay", label: "Повтор", icon: "⏪" },
+    { path: "/simulator", label: "Симуляция", icon: "⚡" },
+    { path: "/dashboard", label: "Здоровье системы", icon: "📋" },
   ],
   simulator: [
-    { path: "/cabin", label: "Dashboard", icon: "📊" },
-    { path: "/simulator", label: "Simulation", icon: "⚡" },
-    { path: "/dispatch", label: "Fleet Overview", icon: "🚂" },
-    { path: "/dashboard", label: "System Health", icon: "📋" },
+    { path: "/cabin", label: "Дашборд", icon: "📊" },
+    { path: "/simulator", label: "Симуляция", icon: "⚡" },
+    { path: "/dispatch", label: "Обзор флота", icon: "🚂" },
+    { path: "/dashboard", label: "Здоровье системы", icon: "📋" },
   ],
 };
 
@@ -81,7 +81,7 @@ export default function AppLayout({ children }: Props) {
   return (
     <div className="app-layout">
       <nav className="top-nav">
-        <span className="brand">Kinetic Cockpit</span>
+        <span className="brand">LCAS</span>
         <div className="nav-links">
           {navItems.map((item) => (
             <NavLink
@@ -95,21 +95,21 @@ export default function AppLayout({ children }: Props) {
         </div>
         <div className="nav-spacer" />
         {(role === "admin" || role === "simulator") && (
-          <input className="nav-search" placeholder="Search..." />
+          <input className="nav-search" placeholder="Поиск..." />
         )}
         {hasWarning ? (
           <button className="master-warning-btn active" id="master-warning-nav">
-            ⚠ Master Warning
+            ⚠ Главное предупреждение
           </button>
         ) : (
           <div style={{ padding: "0.4rem 1rem", borderRadius: "var(--radius)", border: "1px solid var(--outline-variant)", color: "var(--outline)", fontFamily: "var(--font-display)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            Systems Normal
+            Системы в норме
           </div>
         )}
         <div className="nav-icons">
           {(role === "admin") && <span className="nav-icon" title="Settings">⚙</span>}
-          <span className="nav-icon" title="Notifications">🔔</span>
-          <span className="nav-icon" title="Theme" onClick={() => document.documentElement.classList.toggle("light-theme")}>🌙</span>
+          <span className="nav-icon" title="Уведомления">🔔</span>
+          <span className="nav-icon" title="Тема" onClick={() => document.documentElement.classList.toggle("light-theme")}>🌙</span>
           <LanguageSwitcher />
           <span className="nav-icon" title={`${username} (${ROLE_LABELS[role] || role})`} style={{ fontSize: "0.7rem", color: "var(--primary)" }}>
             {username}
@@ -138,12 +138,12 @@ export default function AppLayout({ children }: Props) {
 
         {(role === "dispatcher" || role === "admin") && (
           <button className="sidebar-export" onClick={() => window.open("http://localhost:8000/api/reports/export/TE33A-0142?minutes=15&format=csv", "_blank")}>
-            Export Telemetry
+            Экспорт телеметрии
           </button>
         )}
 
         <button className="sidebar-footer-link" onClick={handleLogout}>
-          <span>🚪</span> Sign Out
+          <span>🚪</span> Выход
         </button>
       </aside>
 

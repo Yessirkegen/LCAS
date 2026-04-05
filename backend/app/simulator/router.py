@@ -9,26 +9,30 @@ from fastapi import APIRouter
 import random as _random
 
 from app.simulator.engine import LocomotiveSimulator
+from app.simulator.engine_kz8a import KZ8ASimulator
 from app.simulator.routes_osm import ROUTES_KZ, ALL_ROUTE_IDS
 from app.services.kafka_client import kafka_producer
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/simulator", tags=["simulator"])
 
-_simulators: dict[str, LocomotiveSimulator] = {}
+_simulators: dict = {}
 _tasks: dict[str, asyncio.Task] = {}
 
 
-async def _run_simulator(sim: LocomotiveSimulator, hz: float = 1.0):
+async def _run_simulator(sim, hz: float = 1.0):
     interval = 1.0 / hz
     while True:
-        packet = sim.tick(dt=interval)
-        data = packet.model_dump(mode="json")
-        data["timestamp"] = packet.timestamp.isoformat()
+        result = sim.tick(dt=interval)
+        if isinstance(result, dict):
+            data = result
+        else:
+            data = result.model_dump(mode="json")
+            data["timestamp"] = result.timestamp.isoformat()
         try:
             await kafka_producer.send_and_wait(
                 "raw-telemetry",
-                key=packet.locomotive_id,
+                key=data.get("locomotive_id", "unknown"),
                 value=data,
             )
         except Exception as e:
@@ -42,11 +46,17 @@ async def start_simulator(
     route: str = "astana_karaganda",
     hz: float = 1.0,
     count: int = 1,
+    loco_type: str = "TE33A",
 ):
     started = []
     routes_used: dict[str, int] = {}
     for i in range(count):
-        lid = locomotive_id if count == 1 else f"TE33A-{i:04d}"
+        if count == 1:
+            lid = locomotive_id
+        else:
+            prefix = "KZ8A" if loco_type == "KZ8A" else "TE33A"
+            lid = f"{prefix}-{i:04d}"
+
         if lid in _tasks and not _tasks[lid].done():
             continue
 
@@ -55,7 +65,12 @@ async def start_simulator(
         else:
             r = route
 
-        sim = LocomotiveSimulator(locomotive_id=lid, route=r)
+        is_electric = loco_type == "KZ8A" or lid.startswith("KZ8A")
+
+        if is_electric:
+            sim = KZ8ASimulator(locomotive_id=lid, route=r)
+        else:
+            sim = LocomotiveSimulator(locomotive_id=lid, route=r)
         sim.speed = 40 + _random.randint(0, 60)
 
         if count > 1:

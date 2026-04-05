@@ -5,7 +5,7 @@ const STEPS = [
   { target: ".speed-widget", title: "Скорость", desc: "Текущая скорость локомотива. При боксовании появляется красный индикатор." },
   { target: ".master-alerts", title: "LCAS Алерты", desc: "Master Warning (красная) и Master Caution (жёлтая) — как в авиации. Нажмите для подтверждения." },
   { target: ".alerts-widget", title: "Список алертов", desc: "Активные предупреждения с голосовым оповещением. WARNING повторяется каждые 5 сек." },
-  { target: ".chart-widget", title: "Тренды", desc: "Графики параметров в реальном времени. Пунктир — прогноз Health Index." },
+  { target: ".chart-widget", title: "Тренды", desc: "Графики параметров в реальном времени. Пунктир — прогноз индекса здоровья." },
 ];
 
 interface Props {

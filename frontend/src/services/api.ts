@@ -1,5 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" ? `${window.location.protocol}//${window.location.host}` : "http://localhost:8000");
+const WS_URL = import.meta.env.VITE_WS_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}` : "ws://localhost:8000");
 
 export async function login(username: string, password: string) {
   const res = await fetch(`${API_URL}/api/auth/login`, {

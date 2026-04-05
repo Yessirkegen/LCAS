@@ -7,4 +7,7 @@ export default defineConfig({
   optimizeDeps: {
     include: ['tslib', 'echarts', 'echarts-for-react'],
   },
+  server: {
+    allowedHosts: true,
+  },
 })

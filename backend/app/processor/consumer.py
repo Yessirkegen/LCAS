@@ -227,14 +227,27 @@ async def run_processor():
             for param in stuck:
                 stuck_key = f"{loco_id}:stuck_{param}"
                 if stuck_key not in _active_alerts:
+                    _param_ru = {
+                        "main_reservoir_pressure": "давления ГР",
+                        "brake_line_pressure": "тормозной магистрали",
+                        "fuel_level": "уровня топлива",
+                        "water_temp_inlet": "температуры воды (вход)",
+                        "water_temp_outlet": "температуры воды (выход)",
+                        "oil_temp_inlet": "температуры масла (вход)",
+                        "oil_temp_outlet": "температуры масла (выход)",
+                        "oil_pressure_kpa": "давления масла",
+                        "water_pressure_kpa": "давления воды",
+                        "traction_current": "тока тяги",
+                        "speed_kmh": "скорости",
+                    }.get(param, param.replace("_", " "))
                     _active_alerts[stuck_key] = {
                         "id": f"stuck-{param[:8]}",
                         "locomotive_id": loco_id,
                         "timestamp": data.get("timestamp", datetime.now(timezone.utc).isoformat()),
                         "level": "CAUTION",
                         "param": f"stuck_{param}",
-                        "message": f"Датчик {param} — нет изменений (stuck)",
-                        "voice_text": f"ВНИМАНИЕ. ДАТЧИК {param.upper().replace('_',' ')} НЕТ ИЗМЕНЕНИЙ",
+                        "message": f"Датчик {_param_ru} — нет изменений",
+                        "voice_text": f"ВНИМАНИЕ. ДАТЧИК {_param_ru.upper()} НЕТ ИЗМЕНЕНИЙ",
                         "status": "active",
                     }
 
