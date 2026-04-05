@@ -95,7 +95,7 @@ export function useLCAS() {
   });
 
   const processedAlerts = useRef<Set<string>>(new Set());
-  const warningRepeatRef = useRef<number>();
+  const warningRepeatRef = useRef<number>(0);
   const lastWarningText = useRef<string>("");
 
   const processAlerts = useCallback((alerts: Alert[]) => {

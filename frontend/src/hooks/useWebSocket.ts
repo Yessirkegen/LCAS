@@ -11,7 +11,7 @@ export function useWebSocket({ url, onMessage, reconnectInterval = 2000, maxReco
   const [status, setStatus] = useState<"connecting" | "online" | "offline" | "reconnecting">("connecting");
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectCount = useRef(0);
-  const reconnectTimer = useRef<number>();
+  const reconnectTimer = useRef<number>(0);
 
   const connect = useCallback(() => {
     if (!url) return;

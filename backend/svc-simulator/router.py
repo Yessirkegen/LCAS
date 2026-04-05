@@ -22,22 +22,26 @@ _tasks: dict[str, asyncio.Task] = {}
 
 async def _run_simulator(sim, hz: float = 1.0):
     interval = 1.0 / hz
-    while True:
-        result = sim.tick(dt=interval)
-        if isinstance(result, dict):
-            data = result
-        else:
-            data = result.model_dump(mode="json")
-            data["timestamp"] = result.timestamp.isoformat()
-        try:
-            await kafka_producer.send_and_wait(
-                "raw-telemetry",
-                key=data.get("locomotive_id", "unknown"),
-                value=data,
-            )
-        except Exception as e:
-            logger.error(f"Simulator send error: {e}")
-        await asyncio.sleep(interval)
+    loco_id = getattr(sim, 'locomotive_id', 'unknown')
+    try:
+        while True:
+            result = sim.tick(dt=interval)
+            if isinstance(result, dict):
+                data = result
+            else:
+                data = result.model_dump(mode="json")
+                data["timestamp"] = result.timestamp.isoformat()
+            try:
+                await kafka_producer.send_and_wait(
+                    "raw-telemetry",
+                    key=data.get("locomotive_id", "unknown"),
+                    value=data,
+                )
+            except Exception as e:
+                logger.error(f"Simulator send error for {loco_id}: {e}")
+            await asyncio.sleep(interval)
+    except Exception as e:
+        logger.error(f"Simulator task CRASHED for {loco_id}: {e}", exc_info=True)
 
 
 @router.post("/start")

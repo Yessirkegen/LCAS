@@ -11,7 +11,7 @@ export default function Replay() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [minutes, setMinutes] = useState(5);
-  const intervalRef = useRef<number>();
+  const intervalRef = useRef<number>(0);
 
   useEffect(() => {
     if (!id) return;
@@ -71,7 +71,7 @@ export default function Replay() {
               strokeDasharray={`${(hiValue / 100) * 2 * Math.PI * 70 * 0.75} ${2 * Math.PI * 70}`}
               strokeLinecap="round" transform="rotate(135 100 100)" style={{ transition: "stroke-dasharray 0.5s" }} />
             <text x="100" y="95" textAnchor="middle" fill="var(--on-surface)" fontSize="42" fontWeight="700" fontFamily="Space Grotesk">{Math.round(hiValue)}</text>
-            <text x="100" y="125" textAnchor="middle" fill={hiColor} fontSize="12" fontWeight="600" fontFamily="Space Grotesk" textTransform="uppercase">
+            <text x="100" y="125" textAnchor="middle" fill={hiColor} fontSize="12" fontWeight="600" fontFamily="Space Grotesk" style={{ textTransform: "uppercase" }}>
               {hiValue >= 80 ? "Стабильно" : hiValue >= 50 ? "Внимание" : "Критический"}
             </text>
           </svg>

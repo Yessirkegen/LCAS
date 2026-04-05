@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  lint-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +20,26 @@ jobs:
       - name: Install backend deps
         run: pip install -r backend/requirements.txt
 
-      - name: Lint backend
+      - name: Compile backend (monolith)
         run: python -m py_compile backend/app/main.py
+
+      - name: Compile shared package
+        run: |
+          cd backend
+          python -m py_compile shared/config.py
+          python -m py_compile shared/auth.py
+          python -m py_compile shared/services/database.py
+          python -m py_compile shared/services/redis_client.py
+          python -m py_compile shared/services/kafka_client.py
+
+      - name: Compile microservices
+        run: |
+          cd backend
+          for svc in svc-ingestion svc-processor svc-api svc-ws-gateway svc-simulator; do
+            for f in $svc/*.py; do
+              python -m py_compile "$f" && echo "OK: $f"
+            done
+          done
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -36,20 +54,24 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
-    needs: lint-and-test
+    needs: lint-and-build
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build backend image
-        run: docker build -t locomotive-backend ./backend
+      - name: Build svc-ingestion
+        run: docker build -t lcas-ingestion -f backend/svc-ingestion/Dockerfile backend/
 
-      - name: Build frontend image
-        run: docker build -t locomotive-frontend ./frontend
+      - name: Build svc-processor
+        run: docker build -t lcas-processor -f backend/svc-processor/Dockerfile backend/
 
-  # deploy:
-  #   runs-on: ubuntu-latest
-  #   needs: docker-build
-  #   if: github.ref == 'refs/heads/main'
-  #   steps:
-  #     - name: Deploy to K3s
-  #       run: echo "Deploy step — configure when servers ready"
+      - name: Build svc-api
+        run: docker build -t lcas-api -f backend/svc-api/Dockerfile backend/
+
+      - name: Build svc-ws-gateway
+        run: docker build -t lcas-ws-gateway -f backend/svc-ws-gateway/Dockerfile backend/
+
+      - name: Build svc-simulator
+        run: docker build -t lcas-simulator -f backend/svc-simulator/Dockerfile backend/
+
+      - name: Build frontend
+        run: docker build -t lcas-frontend frontend/
