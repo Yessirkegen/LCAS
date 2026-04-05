@@ -2,6 +2,12 @@
 
 Система мониторинга и оповещения экипажа локомотива в реальном времени. Поддерживает **1700+ локомотивов** одновременно с микросервисной архитектурой.
 
+### Диспетчерская — 1800 локомотивов на карте
+![Dispatch](docs/screenshots/dispatch.png)
+
+### Кабина машиниста — каскадный аварийный сценарий (HI = 34, категория E)
+![Cabin Critical](docs/screenshots/cabin-critical.png)
+
 ## Быстрый старт (1 команда)
 
 ```bash
@@ -250,6 +256,30 @@ make clean            # Удалить всё включая данные
 | POST | `/simulator/start?count=N&loco_type=TE33A` | Запуск симулятора |
 | POST | `/simulator/scenario?scenario=cascade` | Аварийный сценарий |
 | WS | `/ws?token=JWT&loco_id=ID` | WebSocket телеметрия |
+
+## Нагрузочное тестирование (RPS)
+
+Результаты бенчмарка на **m6i.4xlarge** (16 vCPU, 64 GB RAM) при 1800 активных локомотивах:
+
+| Эндпоинт | RPS | Latency (avg) | Concurrency | Failed |
+|----------|:---:|:-------------:|:-----------:|:------:|
+| `GET /health` | **6 162** | 8 ms | 50 | 0 |
+| `POST /ingest/telemetry` | **4 749** | 6 ms | 30 | 0 |
+| `GET /api/locomotives` (1800 locos) | 15 | 1 290 ms | 20 | 0 |
+
+- **Ingestion**: 4 749 req/sec — в 2.8x больше чем нужно для 1700 лок на 1 Гц
+- **Health check**: 6 162 req/sec — headroom для мониторинга
+- **Fleet list**: тяжёлый запрос (1800 записей из Redis), но для диспетчера достаточно
+
+### Throughput пайплайна
+
+| Метрика | Значение |
+|---------|----------|
+| Kafka ingestion | **1 800 msg/sec** (sustained) |
+| Kafka → Redis (processing) | **1 800 msg/sec** (8 consumers) |
+| Redis pub/sub fan-out | **3 600 publish/sec** |
+| TimescaleDB batch insert | **3 600 rows / 2 sec** |
+| WebSocket delivery | **< 500 ms** end-to-end |
 
 ## Демо
 
