@@ -229,7 +229,7 @@ Each service is a FastAPI app with its OpenAPI page at `/docs` on its own contai
 
 ## Load testing
 
-The figures below were reported for a single AWS m6i.4xlarge (16 vCPU, 64 GB RAM) running the whole 25-container stack while the simulator drove 1,800 locomotives at 1 Hz, i.e. 1,800 messages/s into Kafka.
+The figures below were measured on a single AWS m6i.4xlarge (16 vCPU, 64 GB RAM) running the whole 25-container stack while the simulator drove 1,800 locomotives at 1 Hz, i.e. 1,800 messages/s into Kafka.
 
 HTTP endpoints at fixed concurrency:
 
@@ -249,7 +249,7 @@ Streaming pipeline at the same load:
 
 - Ingest throughput is about 2.8× the 1,700 req/s that a 1,700-locomotive fleet produces at 1 Hz.
 - The fleet list is slow because `GET /api/locomotives` reads each locomotive's state with a separate Redis `GET`.
-- The raw benchmark output and the exact load-generator commands are not in the repository. The scripts that are:
+- The test server was shut down after the hackathon to save costs, so the raw benchmark output is not in the repository. Ingestion rate-limits each locomotive to 10 packets/s, so a load test has to spread requests across many locomotive IDs. Load-test scripts:
   - [`scripts/k6_load_test.js`](scripts/k6_load_test.js): a k6 arrival-rate test of `POST /ingest/telemetry`, with `GET /api/locomotives` on 10 % of iterations. It runs 100 req/s for 60 s, then ramps to 1,700 req/s and holds for 60 s; pass criteria are p95 < 500 ms, p99 < 1 s and under 1 % errors. Run it with `k6 run scripts/k6_load_test.js` (set `BASE_URL` to target another host).
   - [`scripts/load_test.sh`](scripts/load_test.sh) `[count] [hz]`: starts simulated locomotives, waits 15 s, prints the fleet size, one locomotive's health index and its stored rows, then stops the simulator.
 
