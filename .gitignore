@@ -2,16 +2,40 @@ __pycache__/
 *.pyc
 .env
 .env.local
+.env.*
+!.env.example
 *.egg-info/
 dist/
 build/
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 node_modules/
 frontend/dist/
 frontend/build/
+*.tsbuildinfo
+
+# Editors and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Large media (keep demo videos out of git history)
+*.mp4
+*.mov
+*.webm
 
 *.db
 *.sqlite3
